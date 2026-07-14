@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -10,8 +11,9 @@
 
         body {
             font-family: 'Share Tech Mono', monospace;
-            overflow: hidden;
             background-color: #020617; /* 画面全体の背景 */
+            /* ★修正：画面全体のスクロールを許可し、狭い画面でもパーツが潰れないようにします */
+            overflow-y: auto;
         }
 
         /* 輝くネオンエフェクト */
@@ -93,51 +95,74 @@
         ::-webkit-scrollbar-thumb { background: #1e3a8a; border-radius: 4px; }
     </style>
 </head>
-<body class="text-slate-100 h-screen flex flex-col select-none relative" onclick="initAudio()">
+<body class="text-slate-100 min-h-screen flex flex-col items-center select-none relative p-3 md:p-6" onclick="initAudio()">
 
-    <!-- ヘッダー＆HUD領域 -->
-    <div class="w-full flex justify-between items-start p-4 z-10">
-        <div class="flex flex-col">
-            <h1 class="text-3xl font-extrabold text-blue-500 tracking-widest text-glow mb-1">
-                CYBER TYPE
-            </h1>
-            <div id="mode-display" class="text-xs text-blue-400 tracking-wider">SELECT MODE</div>
-            
-            <!-- サバイバル用HPバー -->
-            <div id="hp-container" class="mt-2 w-48 h-2 bg-gray-900 border border-blue-900 rounded hidden">
-                <div id="hp-bar" class="h-full bg-blue-500 shadow-[0_0_10px_#3b82f6] transition-all duration-300" style="width: 100%;"></div>
+    <!-- 全てのパーツを1つの最大幅 4xl (896px) の共通コンテナで包み込み、左右のラインを完全に同期 -->
+    <div class="w-full max-w-4xl flex flex-col gap-4 pointer-events-none">
+
+        <!-- 1. ヘッダー＆HUD領域 -->
+        <div id="game-hud" class="w-full flex justify-between items-start z-10">
+            <div class="flex flex-col">
+                <h1 class="text-3xl font-extrabold text-blue-500 tracking-widest text-glow mb-1">
+                    CYBER TYPE
+                </h1>
+                <div id="mode-display" class="text-xs text-blue-400 tracking-wider">SELECT MODE</div>
+                
+                <!-- サバイバル用HPバー -->
+                <div id="hp-container" class="mt-2 w-48 h-2 bg-gray-900 border border-blue-900 rounded hidden">
+                    <div id="hp-bar" class="h-full bg-blue-500 shadow-[0_0_10px_#3b82f6] transition-all duration-300" style="width: 100%;"></div>
+                </div>
+                <!-- タイムアタック用タイマー -->
+                <div id="timer-display" class="mt-2 text-xl text-blue-300 font-bold hidden text-glow">00.00s</div>
             </div>
-            <!-- タイムアタック用タイマー -->
-            <div id="timer-display" class="mt-2 text-xl text-blue-300 font-bold hidden text-glow">00.00s</div>
+
+            <!-- スコア・コンボ -->
+            <div class="flex gap-6 text-right">
+                <div class="flex flex-col items-end">
+                    <span class="text-[10px] text-gray-500">SCORE</span>
+                    <span id="score-display" class="text-2xl text-white font-bold text-glow">00000</span>
+                </div>
+                <div class="flex flex-col items-end">
+                    <span class="text-[10px] text-gray-500">COMBO</span>
+                    <span id="combo-display" class="text-2xl text-blue-400 font-bold text-glow">0</span>
+                </div>
+                <div class="flex flex-col items-end">
+                    <span class="text-[10px] text-gray-500">WPM</span>
+                    <span id="wpm-display" class="text-2xl text-gray-300 font-bold">0</span>
+                </div>
+            </div>
         </div>
 
-        <!-- スコア・コンボ -->
-        <div class="flex gap-6 text-right">
-            <div class="flex flex-col items-end">
-                <span class="text-[10px] text-gray-500">SCORE</span>
-                <span id="score-display" class="text-2xl text-white font-bold text-glow">00000</span>
-            </div>
-            <div class="flex flex-col items-end">
-                <span class="text-[10px] text-gray-500">COMBO</span>
-                <span id="combo-display" class="text-2xl text-blue-400 font-bold text-glow">0</span>
-            </div>
-            <div class="flex flex-col items-end">
-                <span class="text-[10px] text-gray-500">WPM</span>
-                <span id="wpm-display" class="text-2xl text-gray-300 font-bold">0</span>
+        <!-- 2. プレイエリア枠（★重要：潰れるのを防ぐため、高さを固定値 h-[400px]、大画面では h-[480px] に設定します） -->
+        <div class="w-full z-10 relative h-[400px] md:h-[480px] transition-all">
+            <div id="play-area" class="absolute inset-0 border border-blue-900 border-glow bg-gray-900/40 rounded-lg overflow-hidden">
+                <canvas id="game-canvas" class="absolute inset-0 w-full h-full"></canvas>
+                
+                <!-- アクションテキスト（枠内中央に表示） -->
+                <div id="action-text" class="absolute inset-0 flex items-center justify-center text-2xl font-bold text-blue-400 text-glow transition-opacity duration-300 opacity-0">
+                    PERFECT CHAIN!
+                </div>
             </div>
         </div>
-    </div>
 
-    <!-- プレイエリア枠（この中でターゲットが動く） -->
-    <div class="flex-grow w-full flex justify-center items-center px-4 z-10 pointer-events-none mb-2">
-        <div id="play-area" class="w-full max-w-4xl h-full border border-blue-900 border-glow bg-gray-900/40 rounded-lg relative overflow-hidden">
-            <canvas id="game-canvas" class="absolute inset-0 w-full h-full"></canvas>
-            
-            <!-- アクションテキスト（枠内中央に表示） -->
-            <div id="action-text" class="absolute inset-0 flex items-center justify-center text-2xl font-bold text-blue-400 text-glow transition-opacity duration-300 opacity-0 pointer-events-none">
-                PERFECT CHAIN!
+        <!-- 3. 入力中の単語を大きく映し出す別枠モニターエリア -->
+        <div id="focus-display-container" class="w-full bg-gray-950/90 border border-blue-900 rounded-md p-3 border-glow flex items-center justify-between transition-all duration-300">
+            <span class="text-xs text-blue-400 font-bold tracking-widest font-mono">ACTIVE TARGET</span>
+            <div id="focus-word-monitor" class="flex items-center gap-6 flex-grow justify-center">
+                <span class="text-sm text-gray-500 animate-pulse">AWAITING PROTOCOL...</span>
             </div>
         </div>
+
+        <!-- 4. ターゲット一覧 -->
+        <div class="w-full bg-gray-900/60 backdrop-blur border border-blue-900 rounded-lg p-3 border-glow flex flex-col gap-1.5 overflow-hidden h-32" id="target-list-container">
+            <!-- JSで挿入 -->
+        </div>
+
+        <!-- 5. キーボードエリア（横幅を親コンテナに100%合わせ、左右端を完全に一致させるレスポンシブ比率配列仕様） -->
+        <div id="keyboard" class="flex flex-col gap-1.5 p-4 bg-gray-900/80 backdrop-blur rounded-lg border border-blue-900 border-glow w-full pointer-events-auto">
+            <!-- JSで生成 -->
+        </div>
+
     </div>
 
     <!-- モード選択・リザルト画面 (オーバーレイ) -->
@@ -196,29 +221,6 @@
         </div>
     </div>
 
-    <!-- 下部（ターゲットリスト ＆ キーボード） -->
-    <div class="mt-auto flex flex-col items-center w-full px-4 pb-6 z-10 pointer-events-none">
-        
-        <!-- ★新規：入力中の単語を大きく映し出す別枠モニターエリア -->
-        <div id="focus-display-container" class="w-full max-w-4xl bg-gray-950/90 border border-blue-900 rounded-md p-3 mb-1.5 border-glow flex items-center justify-between transition-all duration-300">
-            <span class="text-xs text-blue-400 font-bold tracking-widest font-mono">ACTIVE TARGET</span>
-            <div id="focus-word-monitor" class="flex items-center gap-6 flex-grow justify-center">
-                <!-- JSで現在フォーカスされている単語の進行状況を大きく描画します -->
-                <span class="text-sm text-gray-500 animate-pulse">AWAITING PROTOCOL...</span>
-            </div>
-        </div>
-
-        <!-- ターゲット一覧 -->
-        <div class="w-full max-w-4xl bg-gray-900/60 backdrop-blur border border-blue-900 rounded-t-xl p-3 mb-1 border-glow flex flex-col gap-1.5 overflow-hidden h-32" id="target-list-container">
-            <!-- JSで挿入 -->
-        </div>
-
-        <!-- キーボードエリア -->
-        <div id="keyboard" class="flex flex-col gap-1.5 p-4 bg-gray-900/80 backdrop-blur rounded-b-xl border border-blue-900 border-glow w-full max-w-4xl pointer-events-auto">
-            <!-- JSで生成 -->
-        </div>
-    </div>
-
     <script>
         /**
          * --- ひらがなからローマ字への自動変換マップ ---
@@ -234,7 +236,7 @@
             "ぎゃ": ["gya"], "ぎゅ": ["gyu"], "ぎょ": ["gyo"],
             "じゃ": ["ja", "zya"], "じゅ": ["ju", "zyu"], "じょ": ["jo", "zyo"],
             "びゃ": ["bya"], "びゅ": ["byu"], "びょ": ["byo"],
-            "ぴゃ": ["pya"], "ぴゅ": ["pyu"], "ぴょ": ["pyo"],
+            "ぴゃ": ["pya"], "ぴゅ": ["pyu"], "ぴょ": ["ぴょ"],
             "ふぁ": ["fa"], "ふぃ": ["fi"], "ふぇ": ["fe"], "ふぉ": ["fo"],
             "でぃ": ["dhi", "di"], "どぅ": ["dwu"],
             "てぃ": ["thi", "ti"], "とぅ": ["twu"],
@@ -316,7 +318,7 @@
                     return;
                 }
 
-                // 3. 2文字の拗音変換（最優先）
+                // 3. 2文字 of 拗音変換（最優先）
                 if (i + 1 < kana.length) {
                     const twoChars = kana.substring(i, i + 2);
                     if (romanMap[twoChars]) {
@@ -391,28 +393,28 @@
          */
         const keyboardLayout = [
             [
-                { code: 'Escape', label: 'Esc', extra: 'w-10' },
-                { code: 'Digit1', label: '1' }, { code: 'Digit2', label: '2' }, { code: 'Digit3', label: '3' }, { code: 'Digit4', label: '4' }, { code: 'Digit5', label: '5' }, { code: 'Digit6', label: '6' }, { code: 'Digit7', label: '7' }, { code: 'Digit8', label: '8' }, { code: 'Digit9', label: '9' }, { code: 'Digit0', label: '0' }, { code: 'Minus', label: '-' }, { code: 'Equal', label: '=' }, 
-                { code: 'Backspace', label: 'BS', extra: 'flex-grow' }
+                { code: 'Escape', label: 'Esc', flex: 1.2 },
+                { code: 'Digit1', label: '1', flex: 1 }, { code: 'Digit2', label: '2', flex: 1 }, { code: 'Digit3', label: '3', flex: 1 }, { code: 'Digit4', label: '4', flex: 1 }, { code: 'Digit5', label: '5', flex: 1 }, { code: 'Digit6', label: '6', flex: 1 }, { code: 'Digit7', label: '7', flex: 1 }, { code: 'Digit8', label: '8', flex: 1 }, { code: 'Digit9', label: '9', flex: 1 }, { code: 'Digit0', label: '0', flex: 1 }, { code: 'Minus', label: '-', flex: 1 }, { code: 'Equal', label: '=', flex: 1 }, 
+                { code: 'Backspace', label: 'BS', flex: 1.8 }
             ],
             [
-                { code: 'Tab', label: 'Tab', extra: 'w-14' }, { code: 'KeyQ', label: 'Q' }, { code: 'KeyW', label: 'W' }, { code: 'KeyE', label: 'E' }, { code: 'KeyR', label: 'R' }, { code: 'KeyT', label: 'T' }, { code: 'KeyY', label: 'Y' }, { code: 'KeyU', label: 'U' }, { code: 'KeyI', label: 'I' }, { code: 'KeyO', label: 'O' }, { code: 'KeyP', label: 'P' }, { code: 'BracketLeft', label: '[' }, { code: 'BracketRight', label: ']' }, 
-                { code: 'Enter', label: 'Enter', extra: 'flex-grow w-16' }
+                { code: 'Tab', label: 'Tab', flex: 1.5 }, { code: 'KeyQ', label: 'Q', flex: 1 }, { code: 'KeyW', label: 'W', flex: 1 }, { code: 'KeyE', label: 'E', flex: 1 }, { code: 'KeyR', label: 'R', flex: 1 }, { code: 'KeyT', label: 'T', flex: 1 }, { code: 'KeyY', label: 'Y', flex: 1 }, { code: 'KeyU', label: 'U', flex: 1 }, { code: 'KeyI', label: 'I', flex: 1 }, { code: 'KeyO', label: 'O', flex: 1 }, { code: 'KeyP', label: 'P', flex: 1 }, { code: 'BracketLeft', label: '[', flex: 1 }, { code: 'BracketRight', label: ']', flex: 1 }, 
+                { code: 'Enter', label: 'Enter', flex: 1.5 }
             ],
             [
-                { code: 'CapsLock', label: 'Caps', extra: 'w-16' }, { code: 'KeyA', label: 'A' }, { code: 'KeyS', label: 'S' }, { code: 'KeyD', label: 'D' }, { code: 'KeyF', label: 'F' }, { code: 'KeyG', label: 'G' }, { code: 'KeyH', label: 'H' }, { code: 'KeyJ', label: 'J' }, { code: 'KeyK', label: 'K' }, { code: 'KeyL', label: 'L' }, { code: 'Semicolon', label: ';' }, { code: 'Quote', label: '\'' }, { code: 'Backslash', label: '\\' }
+                { code: 'CapsLock', label: 'Caps', flex: 1.8 }, { code: 'KeyA', label: 'A', flex: 1 }, { code: 'KeyS', label: 'S', flex: 1 }, { code: 'KeyD', label: 'D', flex: 1 }, { code: 'KeyF', label: 'F', flex: 1 }, { code: 'KeyG', label: 'G', flex: 1 }, { code: 'KeyH', label: 'H', flex: 1 }, { code: 'KeyJ', label: 'J', flex: 1 }, { code: 'KeyK', label: 'K', flex: 1 }, { code: 'KeyL', label: 'L', flex: 1 }, { code: 'Semicolon', label: ';', flex: 1 }, { code: 'Quote', label: '\'', flex: 1 }, { code: 'Backslash', label: '\\', flex: 1.2 }
             ],
             [
-                { code: 'ShiftLeft', label: 'Shift', extra: 'w-20' }, { code: 'KeyZ', label: 'Z' }, { code: 'KeyX', label: 'X' }, { code: 'KeyC', label: 'C' }, { code: 'KeyV', label: 'V' }, { code: 'KeyB', label: 'B' }, { code: 'KeyN', label: 'N' }, { code: 'KeyM', label: 'M' }, { code: 'Comma', label: ',' }, { code: 'Period', label: '.' }, { code: 'Slash', label: '/' }, 
-                { code: 'ShiftRight', label: 'Shift', extra: 'flex-grow' }
+                { code: 'ShiftLeft', label: 'Shift', flex: 2.3 }, { code: 'KeyZ', label: 'Z', flex: 1 }, { code: 'KeyX', label: 'X', flex: 1 }, { code: 'KeyC', label: 'C', flex: 1 }, { code: 'KeyV', label: 'V', flex: 1 }, { code: 'KeyB', label: 'B', flex: 1 }, { code: 'KeyN', label: 'N', flex: 1 }, { code: 'KeyM', label: 'M', flex: 1 }, { code: 'Comma', label: ',', flex: 1 }, { code: 'Period', label: '.', flex: 1 }, { code: 'Slash', label: '/', flex: 1 }, 
+                { code: 'ShiftRight', label: 'Shift', flex: 2.7 }
             ],
             [
-                { code: 'ControlLeft', label: 'Ctrl', extra: 'w-12' }, 
-                { code: 'MetaLeft', label: 'Win', extra: 'w-12' }, 
-                { code: 'AltLeft', label: 'Alt', extra: 'w-12' }, 
-                { code: 'Space', label: '', extra: 'flex-grow max-w-md' }, 
-                { code: 'AltRight', label: 'Alt', extra: 'w-12' }, 
-                { code: 'ControlRight', label: 'Ctrl', extra: 'w-12' }
+                { code: 'ControlLeft', label: 'Ctrl', flex: 1.5 }, 
+                { code: 'MetaLeft', label: 'Win', flex: 1.2 }, 
+                { code: 'AltLeft', label: 'Alt', flex: 1.2 }, 
+                { code: 'Space', label: '', flex: 6.2 }, 
+                { code: 'AltRight', label: 'Alt', flex: 1.2 }, 
+                { code: 'ControlRight', label: 'Ctrl', flex: 1.5 }
             ]
         ];
 
@@ -425,9 +427,12 @@
 
             row.forEach(keyData => {
                 const keyButton = document.createElement('div');
-                const baseClasses = 'flex items-center justify-center rounded text-sm font-bold text-blue-500 bg-gray-950 border border-blue-900/80 shadow-inner transition-all duration-75 h-10 min-w-[2.2rem]';
-                keyButton.className = `${baseClasses} ${keyData.extra || ''}`;
+                const baseClasses = 'flex items-center justify-center rounded text-sm font-bold text-blue-500 bg-gray-950 border border-blue-900/80 shadow-inner transition-all duration-75 h-10';
+                keyButton.className = baseClasses;
                 keyButton.textContent = keyData.label;
+
+                // 横幅を固定ピクセルではなくflex比率で動的に設定
+                keyButton.style.flex = keyData.flex;
 
                 keyButton.id = `key-${keyData.code}`;
                 keyElementsMap[keyData.code] = keyButton;
@@ -490,9 +495,9 @@
             osc.stop(audioCtx.currentTime + 0.25);
         }
 
-        // ★ミス入力時の警告音は削除されました（ playMissSound は鳴らさないため空にしています ）
+        // ミスタイプ音のトリガー
         function playMissSound() {
-            // ノイズや不快感を防ぐため、音を出さないようにしました
+            // ノイズを防ぐため、現在は無音に設定されています
         }
 
         // 同時デリート（マルチシンク）の和音チャイム
@@ -628,7 +633,7 @@
         const uiTargetList = document.getElementById('target-list-container');
         const uiActionText = document.getElementById('action-text');
         
-        // ★新規：別枠表示用DOM
+        // 別枠表示用DOM
         const uiFocusDisplayContainer = document.getElementById('focus-display-container');
         const uiFocusWordMonitor = document.getElementById('focus-word-monitor');
 
@@ -646,7 +651,7 @@
                 this.originalRomajis = generateRomajis(wordDef.kana);
                 this.validRomajis = [...this.originalRomajis];
                 this.typedLength = 0;
-                this.missCount = 0; // 新規：連続ミスマッチ回数を管理するカウンター
+                this.missCount = 0; // 連続ミスマッチ回数
                 
                 this.size = 20;
                 this.x = Math.random() * (width - 100) + 50;
@@ -657,7 +662,7 @@
                 this.speedY = -(state.baseSpeed * speedFactor + Math.random() * 0.2);
                 
                 this.isDying = false;
-                this.isCompleted = false; // 入力を最後まで完了したターゲットかを識別するフラグ
+                this.isCompleted = false; // 入力を最後まで完了したターゲットフラグ
                 
                 this.createListDOM();
             }
@@ -684,7 +689,6 @@
                 // メインフォーカスか保留状態かでCSSクラスとUI表示を切り替える
                 const isFocused = (state.focusedEnemyId === this.id);
                 
-                // 元の基本クラスを適用
                 this.domElement.className = 'target-item flex justify-between items-center py-1 px-2 border-b border-blue-900/30 text-sm';
                 if (isFocused) {
                     this.domElement.classList.add('focus-active');
@@ -692,7 +696,6 @@
                     this.domElement.classList.add('hit');
                 }
 
-                // フォーカスされているターゲットは、パーセンテージもゴールドで光らせる
                 const progressUI = this.typedLength > 0 
                     ? `<span class="text-xs font-bold font-mono ml-2 ${isFocused ? 'text-yellow-400 text-glow-gold' : 'text-blue-400 text-glow'}">[${progressPercent}%]</span>` 
                     : '';
@@ -737,7 +740,7 @@
                     this.destroyDOM(false);
                     if (state.focusedEnemyId === this.id) {
                         state.focusedEnemyId = null; 
-                        updateFocusWordMonitor(); // 別枠表示のリセット
+                        updateFocusWordMonitor(); 
                     }
                     if(state.mode === 'survival') takeDamage(10);
                     createParticles(this.x, 20, '#ef4444', 15);
@@ -811,7 +814,7 @@
                         
                         if (state.focusedEnemyId === this.target.id) {
                             state.focusedEnemyId = null;
-                            updateFocusWordMonitor(); // 別枠表示のリセット
+                            updateFocusWordMonitor(); 
                         }
 
                         playExplodeSound();
@@ -912,11 +915,11 @@
             }
         }
 
-        // ★新規：現在フォーカスされている入力中ワードの別枠モニター表示を更新する関数
+        // 現在フォーカスされている入力中ワードの別枠モニター表示を更新する関数
         function updateFocusWordMonitor() {
             if (!state.isPlaying) {
                 uiFocusWordMonitor.innerHTML = `<span class="text-sm text-gray-500 animate-pulse">AWAITING PROTOCOL...</span>`;
-                uiFocusDisplayContainer.className = "w-full max-w-4xl bg-gray-950/90 border border-blue-900 rounded-md p-3 mb-1.5 border-glow flex items-center justify-between transition-all duration-300";
+                uiFocusDisplayContainer.className = "w-full bg-gray-950/90 border border-blue-900 rounded-md p-3 border-glow flex items-center justify-between transition-all duration-300";
                 return;
             }
 
@@ -928,7 +931,7 @@
                 const progressPercent = Math.round((focusedEnemy.typedLength / currentTargetStr.length) * 100);
 
                 // モニター枠をゴールドネオンに光らせる
-                uiFocusDisplayContainer.className = "w-full max-w-4xl bg-gray-950/95 border border-yellow-500 rounded-md p-3 mb-1.5 border-glow-gold flex items-center justify-between transition-all duration-300";
+                uiFocusDisplayContainer.className = "w-full bg-gray-950/95 border border-yellow-500 rounded-md p-3 border-glow-gold flex items-center justify-between transition-all duration-300";
 
                 uiFocusWordMonitor.innerHTML = `
                     <div class="flex items-center gap-6">
@@ -941,14 +944,31 @@
                     </div>
                 `;
             } else {
-                // ロック対象がない時はシステム待機中の落ち着いた青色の状態
-                uiFocusDisplayContainer.className = "w-full max-w-4xl bg-gray-950/90 border border-blue-900 rounded-md p-3 mb-1.5 border-glow flex items-center justify-between transition-all duration-300";
+                uiFocusDisplayContainer.className = "w-full bg-gray-950/90 border border-blue-900 rounded-md p-3 border-glow flex items-center justify-between transition-all duration-300";
                 uiFocusWordMonitor.innerHTML = `<span class="text-sm text-blue-500/70 font-mono tracking-wider animate-pulse">AWAITING INPUT INTERCEPT...</span>`;
             }
         }
 
-        function handleInput(key) {
+        // 修飾キー（Shift, Ctrl, Alt, Win）の自動消灯を制御するタイマー
+        const activeModKeys = {};
+
+        function handleInput(key, rawCode = null) {
             if(!state.isPlaying) return;
+            
+            // 修飾キーが押された際、そのキーをハイライトし自動でフェードアウトさせるセーフティ
+            if (rawCode && ['ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight', 'AltLeft', 'AltRight', 'MetaLeft'].includes(rawCode)) {
+                const modElem = keyElementsMap[rawCode];
+                if (modElem) {
+                    modElem.classList.add('active-blue');
+                    clearTimeout(activeModKeys[rawCode]);
+                    // 押しっぱなしバグを防ぐため200msで強制消灯
+                    activeModKeys[rawCode] = setTimeout(() => {
+                        modElem.classList.remove('active-blue');
+                    }, 200);
+                }
+                return;
+            }
+
             if(key.length !== 1 || !/[a-zA-Z\-]/.test(key)) return;
             
             state.keysTyped++;
@@ -959,13 +979,12 @@
             state.enemies.forEach(enemy => {
                 if(enemy.isDying || enemy.isCompleted) return;
                 
-                // 1. まずは現在の進行位置のままマッチするかチェック
                 const nextValidRoutes = enemy.validRomajis.filter(romaji => romaji[enemy.typedLength] === inputChar);
 
                 if(nextValidRoutes.length > 0) {
                     enemy.validRomajis = nextValidRoutes;
                     enemy.typedLength++;
-                    enemy.missCount = 0; // 進みがあったのでミスはリセット
+                    enemy.missCount = 0; 
                     
                     if (enemy.typedLength >= enemy.validRomajis[0].length) {
                         enemy.isCompleted = true;
@@ -974,7 +993,6 @@
                     hitCount++;
                     targetEnemies.push(enemy);
                 } else {
-                    // バックトラック・自動乗り換え＆リカバリー処理
                     let recovered = false;
 
                     if (enemy.typedLength > 0) {
@@ -989,7 +1007,7 @@
                             if (matchingRoutes.length > 0) {
                                 enemy.validRomajis = matchingRoutes;
                                 enemy.typedLength = candidate.length;
-                                enemy.missCount = 0; // リカバリー成功時はミスリセット
+                                enemy.missCount = 0; 
                                 
                                 if (enemy.typedLength >= enemy.validRomajis[0].length) {
                                     enemy.isCompleted = true;
@@ -1003,11 +1021,9 @@
                         }
                     }
 
-                    // リカバリーに失敗した場合（純粋なミスマッチ）
                     if (!recovered) {
                         enemy.missCount++;
                         
-                        // 2連続で間違えたら、ここで初めて進捗を 0 にリセット
                         if (enemy.missCount >= 2) {
                             const startValidRoutes = enemy.originalRomajis.filter(romaji => romaji[0] === inputChar);
                             if (startValidRoutes.length > 0) {
@@ -1030,7 +1046,6 @@
                 state.keysHit++;
                 addScore(10 * hitCount); 
                 
-                // 同時入力でも確実にタイピング音が鳴るように変更
                 playLaserSound();
 
                 // アクティブ・フォーカス対象を決定するロジック
@@ -1048,12 +1063,10 @@
                     state.focusedEnemyId = candidateFocusId;
                 }
 
-                // 登録ターゲット全体のDOM表示を更新
                 state.enemies.forEach(enemy => {
                     enemy.updateListDOM();
                 });
 
-                // ★新規：別枠表示を即時更新
                 updateFocusWordMonitor();
 
                 // 弾の発射位置計算（相対座標）
@@ -1083,7 +1096,6 @@
             } else {
                 playMissSound();
 
-                // ★新規：ミスのタイミングでも進行度が0になったり変化するので、別枠を更新
                 updateFocusWordMonitor();
 
                 if(state.combo > 0) {
@@ -1099,7 +1111,7 @@
             }
             const keyElement = keyElementsMap[e.code];
             if (keyElement) keyElement.classList.add('active-blue');
-            handleInput(e.key);
+            handleInput(e.key, e.code);
         });
 
         window.addEventListener('keyup', (e) => {
@@ -1138,7 +1150,7 @@
                 const instantEnemy = new Enemy();
                 state.enemies.push(instantEnemy);
                 state.lastSpawnTime = now; 
-                updateFocusWordMonitor(); // 新規湧きに伴う表示更新
+                updateFocusWordMonitor(); 
             }
 
             // フォーカス対象の敵が「進行度が0に戻ってしまった」か「画面外・死亡・入力完了」した場合は、現在残っている中で一番進捗が進んでいるものに切り替える
@@ -1151,11 +1163,10 @@
                 } else {
                     state.focusedEnemyId = null;
                 }
-                // ★別枠表示の更新
                 updateFocusWordMonitor();
             }
 
-            // 上にあるターゲット順（Y座標が小さい順 ＝ ゴールに近い順）に、表リストの表示を並べ替える
+            // 上にあるターゲット順に、表リストの表示を並べ替える
             const sortedEnemies = state.enemies
                 .filter(e => !e.isDying && e.domElement)
                 .sort((a, b) => a.y - b.y);
@@ -1264,11 +1275,9 @@
                 uiTimer.textContent = userSettings.time.toFixed(2) + 's';
             }
 
-            // ★別枠モニターの初期化
             updateFocusWordMonitor();
             updateHUD();
 
-            // スタート時に最初から難易度に応じたターゲット数が同時に出現するよう変更
             const initialCount = difficultyParams[userSettings.difficulty].initialEnemies;
             for (let i = 0; i < initialCount; i++) {
                 const enemy = new Enemy();
@@ -1276,6 +1285,11 @@
                 state.enemies.push(enemy);
             }
             
+            // ★新規：ゲーム開始時にプレイエリア（ゲーム画面）が最適に見える位置へ自動的にスムーズスクロールします
+            setTimeout(() => {
+                document.getElementById('game-hud').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
+
             if(animationId) cancelAnimationFrame(animationId);
             loop();
         }
@@ -1303,7 +1317,6 @@
             document.getElementById('res-acc').textContent = acc + '%';
             document.getElementById('res-kills').textContent = state.kills;
 
-            // ★終了時のモニター表示リセット
             updateFocusWordMonitor();
         }
 
