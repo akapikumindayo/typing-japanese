@@ -1,0 +1,1289 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CYBER TYPE - INPUT ANALYZER</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+        body {
+            font-family: 'Share Tech Mono', monospace;
+            overflow: hidden;
+            background-color: #020617; /* 画面全体の背景 */
+        }
+
+        /* 輝くネオンエフェクト */
+        .active-blue {
+            background-color: #3b82f6 !important;
+            border-color: #93c5fd !important;
+            color: #ffffff !important;
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.8), 0 0 30px rgba(59, 130, 246, 0.6) !important;
+            transform: scale(0.95);
+        }
+
+        .text-glow {
+            text-shadow: 0 0 8px rgba(59,130,246,0.6), 0 0 12px rgba(59,130,246,0.4);
+        }
+
+        .text-glow-gold {
+            text-shadow: 0 0 8px rgba(234,179,8,0.6), 0 0 12px rgba(234,179,8,0.4);
+        }
+
+        .border-glow {
+            box-shadow: 0 0 15px rgba(30,58,138,0.4), inset 0 0 10px rgba(30,58,138,0.2);
+        }
+
+        .border-glow-gold {
+            box-shadow: 0 0 15px rgba(234,179,8,0.3), inset 0 0 10px rgba(234,179,8,0.1);
+        }
+
+        /* 設定メニューの選択状態 */
+        .setting-btn {
+            transition: all 0.2s;
+        }
+        .setting-btn.selected {
+            background-color: rgba(59, 130, 246, 0.4);
+            border-color: #60a5fa;
+            color: #ffffff;
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.6);
+        }
+
+        /* ターゲットリストのデザイン色分け */
+        .target-item {
+            transition: all 0.25s ease-out;
+            border-left: 4px solid transparent;
+        }
+        
+        /* 1. スタンバイ（マルチシンク等で裏で進んでいるが、主ターゲットではない状態：落ち着いた青） */
+        .target-item.hit {
+            background-color: rgba(37, 99, 235, 0.08); /* 控えめなダークブルー */
+            border-left: 4px solid #2563eb;
+        }
+        
+        /* 2. メインフォーカス（現在タイピングの主軸となっているターゲット：輝くゴールド） */
+        .target-item.focus-active {
+            background-color: rgba(234, 179, 8, 0.15) !important; /* ゴールド */
+            border-left: 4px solid #eab308 !important;
+            box-shadow: 0 0 12px rgba(234, 179, 8, 0.15);
+            transform: scale(1.01) translateX(4px);
+        }
+
+        /* ターゲット撃破成功時の爽快スライドアウト消滅エフェクト */
+        .target-item.destroyed-success {
+            opacity: 0 !important;
+            transform: scale(0.9) translateX(50px) !important;
+            background-color: rgba(147, 197, 253, 0.2) !important; /* 青白く光る */
+            border-left: 4px solid #93c5fd !important;
+            box-shadow: 0 0 20px rgba(147, 197, 253, 0.4) !important;
+        }
+
+        /* ターゲット見逃し失敗時の赤警告上昇消滅エフェクト */
+        .target-item.destroyed-fail {
+            opacity: 0 !important;
+            transform: scale(0.9) translateY(-30px) !important;
+            background-color: rgba(239, 68, 68, 0.2) !important; /* 赤く光る */
+            border-left: 4px solid #ef4444 !important;
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.4) !important;
+        }
+
+        /* スクロールバー非表示 */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-thumb { background: #1e3a8a; border-radius: 4px; }
+    </style>
+</head>
+<body class="text-slate-100 h-screen flex flex-col select-none relative" onclick="initAudio()">
+
+    <!-- ヘッダー＆HUD領域 -->
+    <div class="w-full flex justify-between items-start p-4 z-10">
+        <div class="flex flex-col">
+            <h1 class="text-3xl font-extrabold text-blue-500 tracking-widest text-glow mb-1">
+                CYBER TYPE
+            </h1>
+            <div id="mode-display" class="text-xs text-blue-400 tracking-wider">SELECT MODE</div>
+            
+            <!-- サバイバル用HPバー -->
+            <div id="hp-container" class="mt-2 w-48 h-2 bg-gray-900 border border-blue-900 rounded hidden">
+                <div id="hp-bar" class="h-full bg-blue-500 shadow-[0_0_10px_#3b82f6] transition-all duration-300" style="width: 100%;"></div>
+            </div>
+            <!-- タイムアタック用タイマー -->
+            <div id="timer-display" class="mt-2 text-xl text-blue-300 font-bold hidden text-glow">00.00s</div>
+        </div>
+
+        <!-- スコア・コンボ -->
+        <div class="flex gap-6 text-right">
+            <div class="flex flex-col items-end">
+                <span class="text-[10px] text-gray-500">SCORE</span>
+                <span id="score-display" class="text-2xl text-white font-bold text-glow">00000</span>
+            </div>
+            <div class="flex flex-col items-end">
+                <span class="text-[10px] text-gray-500">COMBO</span>
+                <span id="combo-display" class="text-2xl text-blue-400 font-bold text-glow">0</span>
+            </div>
+            <div class="flex flex-col items-end">
+                <span class="text-[10px] text-gray-500">WPM</span>
+                <span id="wpm-display" class="text-2xl text-gray-300 font-bold">0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- プレイエリア枠（この中でターゲットが動く） -->
+    <div class="flex-grow w-full flex justify-center items-center px-4 z-10 pointer-events-none mb-2">
+        <div id="play-area" class="w-full max-w-4xl h-full border border-blue-900 border-glow bg-gray-900/40 rounded-lg relative overflow-hidden">
+            <canvas id="game-canvas" class="absolute inset-0 w-full h-full"></canvas>
+            
+            <!-- アクションテキスト（枠内中央に表示） -->
+            <div id="action-text" class="absolute inset-0 flex items-center justify-center text-2xl font-bold text-blue-400 text-glow transition-opacity duration-300 opacity-0 pointer-events-none">
+                PERFECT CHAIN!
+            </div>
+        </div>
+    </div>
+
+    <!-- モード選択・リザルト画面 (オーバーレイ) -->
+    <div id="menu-overlay" class="absolute inset-0 flex flex-col items-center justify-center bg-gray-950/80 backdrop-blur-sm z-50">
+        <div class="bg-gray-900 border-2 border-blue-800 rounded-xl p-8 max-w-2xl w-full text-center border-glow">
+            <h2 id="menu-title" class="text-4xl font-bold text-blue-500 mb-2 text-glow">SYSTEM READY</h2>
+            <p id="menu-subtitle" class="text-sm text-gray-400 mb-6">CONFIGURE ENGAGEMENT PROTOCOL</p>
+
+            <div id="result-stats" class="hidden flex-col gap-2 mb-6 text-left bg-gray-950 p-4 border border-blue-900/50 rounded">
+                <div class="flex justify-between"><span class="text-gray-500">SCORE</span><span id="res-score" class="text-white font-bold text-xl">0</span></div>
+                <div class="flex justify-between"><span class="text-gray-500">MAX COMBO</span><span id="res-combo" class="text-blue-400">0</span></div>
+                <div class="flex justify-between"><span class="text-gray-500">WPM</span><span id="res-wpm" class="text-gray-300">0</span></div>
+                <div class="flex justify-between"><span class="text-gray-500">ACCURACY</span><span id="res-acc" class="text-gray-300">100%</span></div>
+                <div class="flex justify-between"><span class="text-gray-500">TARGETS ANALYZED</span><span id="res-kills" class="text-gray-300">0</span></div>
+            </div>
+
+            <!-- 設定オプション -->
+            <div id="settings-panel" class="mb-8 grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
+                <!-- 難易度 -->
+                <div>
+                    <p class="text-xs text-blue-400 font-bold mb-2">DIFFICULTY</p>
+                    <div class="flex flex-col gap-2">
+                        <button onclick="setDifficulty('easy')" id="btn-diff-easy" class="setting-btn py-2 px-4 border border-blue-800 rounded text-blue-300 text-xs hover:bg-blue-900/30">EASY (かんたん)</button>
+                        <button onclick="setDifficulty('normal')" id="btn-diff-normal" class="setting-btn py-2 px-4 border border-blue-800 rounded text-blue-300 text-xs hover:bg-blue-900/30 selected">NORMAL (ふつう)</button>
+                        <button onclick="setDifficulty('hard')" id="btn-diff-hard" class="setting-btn py-2 px-4 border border-blue-800 rounded text-blue-300 text-xs hover:bg-blue-900/30">HARD (スピーディー)</button>
+                    </div>
+                </div>
+                <!-- 速度上昇ペース -->
+                <div>
+                    <p class="text-xs text-blue-400 font-bold mb-2">SPEED ACCELERATION</p>
+                    <div class="flex flex-col gap-2">
+                        <button onclick="setAcceleration('slow')" id="btn-accel-slow" class="setting-btn py-2 px-4 border border-blue-800 rounded text-blue-300 text-xs hover:bg-blue-900/30">SLOW (ゆっくり)</button>
+                        <button onclick="setAcceleration('normal')" id="btn-accel-normal" class="setting-btn py-2 px-4 border border-blue-800 rounded text-blue-300 text-xs hover:bg-blue-900/30 selected">NORMAL (標準)</button>
+                        <button onclick="setAcceleration('fast')" id="btn-accel-fast" class="setting-btn py-2 px-4 border border-blue-800 rounded text-blue-300 text-xs hover:bg-blue-900/30">FAST (はやい)</button>
+                    </div>
+                </div>
+                <!-- 制限時間 -->
+                <div>
+                    <p class="text-xs text-blue-400 font-bold mb-2">TIME LIMIT <span class="text-gray-500 font-normal">(TA)</span></p>
+                    <div class="flex flex-col gap-2">
+                        <button onclick="setTime(30)" id="btn-time-30" class="setting-btn py-2 px-4 border border-blue-800 rounded text-blue-300 text-xs hover:bg-blue-900/30">30 SECONDS</button>
+                        <button onclick="setTime(60)" id="btn-time-60" class="setting-btn py-2 px-4 border border-blue-800 rounded text-blue-300 text-xs hover:bg-blue-900/30 selected">60 SECONDS</button>
+                        <button onclick="setTime(90)" id="btn-time-90" class="setting-btn py-2 px-4 border border-blue-800 rounded text-blue-300 text-xs hover:bg-blue-900/30">90 SECONDS</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-4 justify-center pointer-events-auto">
+                <button onclick="startGame('timeattack')" class="w-1/2 py-3 bg-blue-900/40 hover:bg-blue-600/60 border border-blue-500 rounded text-blue-200 font-bold tracking-widest transition-all hover:shadow-[0_0_15px_#3b82f6] hover:scale-105">
+                    START TIME ATTACK
+                </button>
+                <button onclick="startGame('survival')" class="w-1/2 py-3 bg-red-900/30 hover:bg-red-600/50 border border-red-700 rounded text-red-300 font-bold tracking-widest transition-all hover:shadow-[0_0_15px_#ef4444] hover:scale-105">
+                    START SURVIVAL
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 下部（ターゲットリスト ＆ キーボード） -->
+    <div class="mt-auto flex flex-col items-center w-full px-4 pb-6 z-10 pointer-events-none">
+        
+        <!-- ★新規：入力中の単語を大きく映し出す別枠モニターエリア -->
+        <div id="focus-display-container" class="w-full max-w-4xl bg-gray-950/90 border border-blue-900 rounded-md p-3 mb-1.5 border-glow flex items-center justify-between transition-all duration-300">
+            <span class="text-xs text-blue-400 font-bold tracking-widest font-mono">ACTIVE TARGET</span>
+            <div id="focus-word-monitor" class="flex items-center gap-6 flex-grow justify-center">
+                <!-- JSで現在フォーカスされている単語の進行状況を大きく描画します -->
+                <span class="text-sm text-gray-500 animate-pulse">AWAITING PROTOCOL...</span>
+            </div>
+        </div>
+
+        <!-- ターゲット一覧 -->
+        <div class="w-full max-w-4xl bg-gray-900/60 backdrop-blur border border-blue-900 rounded-t-xl p-3 mb-1 border-glow flex flex-col gap-1.5 overflow-hidden h-32" id="target-list-container">
+            <!-- JSで挿入 -->
+        </div>
+
+        <!-- キーボードエリア -->
+        <div id="keyboard" class="flex flex-col gap-1.5 p-4 bg-gray-900/80 backdrop-blur rounded-b-xl border border-blue-900 border-glow w-full max-w-4xl pointer-events-auto">
+            <!-- JSで生成 -->
+        </div>
+    </div>
+
+    <script>
+        /**
+         * --- ひらがなからローマ字への自動変換マップ ---
+         */
+        const romanMap = {
+            "きゃ": ["kya"], "きゅ": ["kyu"], "きょ": ["kyo"],
+            "しゃ": ["sha", "sya"], "しゅ": ["shu", "syu"], "しょ": ["sho", "syo"],
+            "ちゃ": ["cha", "tya"], "ちゅ": ["chu", "tyu"], "ちょ": ["cho", "tyo"],
+            "にゃ": ["nya"], "にゅ": ["nyu"], "にょ": ["nyo"],
+            "ひゃ": ["hya"], "ひゅ": ["hyu"], "ひょ": ["hyo"],
+            "みゃ": ["mya"], "みゅ": ["myu"], "みょ": ["myo"],
+            "りゃ": ["rya"], "りゅ": ["ryu"], "りょ": ["ryo"],
+            "ぎゃ": ["gya"], "ぎゅ": ["gyu"], "ぎょ": ["gyo"],
+            "じゃ": ["ja", "zya"], "じゅ": ["ju", "zyu"], "じょ": ["jo", "zyo"],
+            "びゃ": ["bya"], "びゅ": ["byu"], "びょ": ["byo"],
+            "ぴゃ": ["pya"], "ぴゅ": ["pyu"], "ぴょ": ["pyo"],
+            "ふぁ": ["fa"], "ふぃ": ["fi"], "ふぇ": ["fe"], "ふぉ": ["fo"],
+            "でぃ": ["dhi", "di"], "どぅ": ["dwu"],
+            "てぃ": ["thi", "ti"], "とぅ": ["twu"],
+            "うぃ": ["wi"], "うぇ": ["we"], "うぉ": ["wo"],
+            "ゔぁ": ["va"], "ゔぃ": ["vi"], "ゔぇ": ["ve"], "ゔぉ": ["vo"],
+            "しぇ": ["she", "sye"], "ちぇ": ["che", "tye"], "じぇ": ["je", "zye"],
+
+            "あ": ["a"], "い": ["i"], "う": ["u"], "え": ["e"], "お": ["o"],
+            "か": ["ka"], "き": ["ki"], "く": ["ku"], "け": ["ke"], "こ": ["ko"],
+            "さ": ["sa"], "し": ["shi", "si"], "す": ["su"], "せ": ["se"], "そ": ["so"],
+            "た": ["ta"], "ち": ["chi", "ti"], "つ": ["tsu", "tu"], "て": ["te"], "と": ["to"],
+            "な": ["na"], "に": ["ni"], "ぬ": ["nu"], "ね": ["ne"], "の": ["no"],
+            "は": ["ha"], "ひ": ["hi"], "ふ": ["fu", "hu"], "へ": ["he"], "ほ": ["ho"],
+            "ま": ["ma"], "み": ["mi"], "む": ["mu"], "め": ["me"], "も": ["mo"],
+            "や": ["ya"], "ゆ": ["yu"], "よ": ["yo"],
+            "ら": ["ra"], "り": ["ri"], "る": ["ru"], "れ": ["re"], "ろ": ["ro"],
+            "わ": ["wa"], "を": ["wo"], "ん": ["n", "nn"],
+            "が": ["ga"], "ぎ": ["gi"], "ぐ": ["gu"], "げ": ["ge"], "ご": ["go"],
+            "ざ": ["za"], "じ": ["ji", "zi"], "ず": ["zu"], "ぜ": ["ze"], "ぞ": ["zo"],
+            "だ": ["da"], "ぢ": ["di", "zi"], "づ": ["du", "zu"], "で": ["de"], "ど": ["do"],
+            "ば": ["ba"], "び": ["bi"], "ぶ": ["bu"], "べ": ["be"], "ぼ": ["bo"],
+            "ぱ": ["pa"], "ぴ": ["pi"], "ぷ": ["pu"], "ぺ": ["pe"], "ぽ": ["po"],
+            "ぁ": ["la", "xa"], "ぃ": ["li", "xi"], "ぅ": ["lu", "xu"], "ぇ": ["le", "xe"], "ぉ": ["lo", "xo"],
+            "ゃ": ["lya", "xya"], "ゅ": ["lyu", "xyu"], "ょ": ["lyo", "xyo"],
+            "っ": ["ltu", "xtu"],
+            "ー": ["-"],
+        };
+
+        /**
+         * --- ひらがな解析・ローマ字組み合わせ自動生成 ---
+         */
+        function generateRomajis(kana) {
+            const results = [];
+
+            function dfs(i, current) {
+                if (i === kana.length) {
+                    results.push(current);
+                    return;
+                }
+
+                // 1. 促音「っ」の処理
+                if (kana[i] === 'っ' && i + 1 < kana.length) {
+                    let nextLen = 1;
+                    let nextKana = kana[i + 1];
+                    if (i + 2 < kana.length) {
+                        const nextTwo = kana.substring(i + 1, i + 3);
+                        if (romanMap[nextTwo]) {
+                            nextKana = nextTwo;
+                            nextLen = 2;
+                        }
+                    }
+
+                    const nextRomajis = romanMap[nextKana];
+                    if (nextRomajis) {
+                        nextRomajis.forEach(nr => {
+                            const firstChar = nr[0];
+                            if (!['a', 'i', 'u', 'e', 'o', 'n', '-'].includes(firstChar)) {
+                                dfs(i + 1 + nextLen, current + firstChar + nr);
+                            }
+                        });
+                    }
+                    romanMap['っ'].forEach(r => {
+                        dfs(i + 1, current + r);
+                    });
+                    return;
+                }
+
+                // 2. 撥音「ん」の処理
+                if (kana[i] === 'ん') {
+                    if (i + 1 < kana.length) {
+                        const nextChar = kana[i + 1];
+                        if (['あ', 'い', 'う', 'え', 'お', 'や', 'ゆ', 'よ', 'ぁ', 'ぃ', 'ぅ', 'ぇ', 'ぉ', 'ゃ', 'ゅ', 'ょ'].includes(nextChar)) {
+                            dfs(i + 1, current + "nn");
+                            return;
+                        }
+                    }
+                    dfs(i + 1, current + "n");
+                    dfs(i + 1, current + "nn");
+                    return;
+                }
+
+                // 3. 2文字の拗音変換（最優先）
+                if (i + 1 < kana.length) {
+                    const twoChars = kana.substring(i, i + 2);
+                    if (romanMap[twoChars]) {
+                        romanMap[twoChars].forEach(r => {
+                            dfs(i + 2, current + r);
+                        });
+                    }
+                }
+
+                // 4. 1文字の通常変換
+                const oneChar = kana[i];
+                if (romanMap[oneChar]) {
+                    romanMap[oneChar].forEach(r => {
+                        dfs(i + 1, current + r);
+                    });
+                }
+            }
+
+            dfs(0, "");
+            return Array.from(new Set(results));
+        }
+
+        /**
+         * --- 辞書データ ---
+         */
+        const dictionary = [
+            { kana: "ねこ", kanji: "猫" },
+            { kana: "いぬ", kanji: "犬" },
+            { kana: "しんかんせん", kanji: "新幹線" },
+            { kana: "さくら", kanji: "桜" },
+            { kana: "にほん", kanji: "日本" },
+            { kana: "たいよう", kanji: "太陽" },
+            { kana: "ふじさん", kanji: "富士山" },
+            { kana: "すし", kanji: "寿司" },
+            { kana: "てんぷら", kanji: "天ぷら" },
+            { kana: "きょうと", kanji: "京都" },
+            { kana: "ぱそこん", kanji: "PC" },
+            { kana: "えんじにあ", kanji: "エンジニア" },
+            { kana: "こーでぃんぐ", kanji: "コーディング" },
+            { kana: "せかい", kanji: "世界" },
+            { kana: "みず", kanji: "水" },
+            { kana: "そら", kanji: "空" },
+            { kana: "がっこう", kanji: "学校" },
+            { kana: "きっぷ", kanji: "切符" }
+        ];
+
+        /**
+         * --- UI構築：キーボード ---
+         */
+        const keyboardLayout = [
+            [
+                { code: 'Escape', label: 'Esc', extra: 'w-10' },
+                { code: 'Digit1', label: '1' }, { code: 'Digit2', label: '2' }, { code: 'Digit3', label: '3' }, { code: 'Digit4', label: '4' }, { code: 'Digit5', label: '5' }, { code: 'Digit6', label: '6' }, { code: 'Digit7', label: '7' }, { code: 'Digit8', label: '8' }, { code: 'Digit9', label: '9' }, { code: 'Digit0', label: '0' }, { code: 'Minus', label: '-' }, { code: 'Equal', label: '=' }, 
+                { code: 'Backspace', label: 'BS', extra: 'flex-grow' }
+            ],
+            [
+                { code: 'Tab', label: 'Tab', extra: 'w-14' }, { code: 'KeyQ', label: 'Q' }, { code: 'KeyW', label: 'W' }, { code: 'KeyE', label: 'E' }, { code: 'KeyR', label: 'R' }, { code: 'KeyT', label: 'T' }, { code: 'KeyY', label: 'Y' }, { code: 'KeyU', label: 'U' }, { code: 'KeyI', label: 'I' }, { code: 'KeyO', label: 'O' }, { code: 'KeyP', label: 'P' }, { code: 'BracketLeft', label: '[' }, { code: 'BracketRight', label: ']' }, 
+                { code: 'Enter', label: 'Enter', extra: 'flex-grow w-16' }
+            ],
+            [
+                { code: 'CapsLock', label: 'Caps', extra: 'w-16' }, { code: 'KeyA', label: 'A' }, { code: 'KeyS', label: 'S' }, { code: 'KeyD', label: 'D' }, { code: 'KeyF', label: 'F' }, { code: 'KeyG', label: 'G' }, { code: 'KeyH', label: 'H' }, { code: 'KeyJ', label: 'J' }, { code: 'KeyK', label: 'K' }, { code: 'KeyL', label: 'L' }, { code: 'Semicolon', label: ';' }, { code: 'Quote', label: '\'' }, { code: 'Backslash', label: '\\' }
+            ],
+            [
+                { code: 'ShiftLeft', label: 'Shift', extra: 'w-20' }, { code: 'KeyZ', label: 'Z' }, { code: 'KeyX', label: 'X' }, { code: 'KeyC', label: 'C' }, { code: 'KeyV', label: 'V' }, { code: 'KeyB', label: 'B' }, { code: 'KeyN', label: 'N' }, { code: 'KeyM', label: 'M' }, { code: 'Comma', label: ',' }, { code: 'Period', label: '.' }, { code: 'Slash', label: '/' }, 
+                { code: 'ShiftRight', label: 'Shift', extra: 'flex-grow' }
+            ],
+            [
+                { code: 'ControlLeft', label: 'Ctrl', extra: 'w-12' }, 
+                { code: 'MetaLeft', label: 'Win', extra: 'w-12' }, 
+                { code: 'AltLeft', label: 'Alt', extra: 'w-12' }, 
+                { code: 'Space', label: '', extra: 'flex-grow max-w-md' }, 
+                { code: 'AltRight', label: 'Alt', extra: 'w-12' }, 
+                { code: 'ControlRight', label: 'Ctrl', extra: 'w-12' }
+            ]
+        ];
+
+        const keyboardContainer = document.getElementById('keyboard');
+        const keyElementsMap = {};
+
+        keyboardLayout.forEach(row => {
+            const rowDiv = document.createElement('div');
+            rowDiv.className = 'flex gap-1 justify-center w-full';
+
+            row.forEach(keyData => {
+                const keyButton = document.createElement('div');
+                const baseClasses = 'flex items-center justify-center rounded text-sm font-bold text-blue-500 bg-gray-950 border border-blue-900/80 shadow-inner transition-all duration-75 h-10 min-w-[2.2rem]';
+                keyButton.className = `${baseClasses} ${keyData.extra || ''}`;
+                keyButton.textContent = keyData.label;
+
+                keyButton.id = `key-${keyData.code}`;
+                keyElementsMap[keyData.code] = keyButton;
+                rowDiv.appendChild(keyButton);
+            });
+            keyboardContainer.appendChild(rowDiv);
+        });
+
+        /**
+         * --- 効果音生成システム (Web Audio API) ---
+         */
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // キー打鍵成功時のSFレーザー音
+        function playLaserSound() {
+            if (!audioCtx) return;
+            initAudio();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(900, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(120, audioCtx.currentTime + 0.08);
+            
+            gain.gain.setValueAtTime(0.06, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+            
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.1);
+        }
+
+        // ターゲット消去完了時のデジタル破裂音
+        function playExplodeSound() {
+            if (!audioCtx) return;
+            initAudio();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+            osc.frequency.linearRampToValueAtTime(30, audioCtx.currentTime + 0.2);
+            
+            gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+            
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.25);
+        }
+
+        // ★ミス入力時の警告音は削除されました（ playMissSound は鳴らさないため空にしています ）
+        function playMissSound() {
+            // ノイズや不快感を防ぐため、音を出さないようにしました
+        }
+
+        // 同時デリート（マルチシンク）の和音チャイム
+        function playMultiSyncSound() {
+            if (!audioCtx) return;
+            initAudio();
+            const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6 の和音
+            const now = audioCtx.currentTime;
+            
+            notes.forEach((freq, idx) => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, now + idx * 0.03); // アルペジオ風に少しズラす
+                osc.frequency.exponentialRampToValueAtTime(freq * 1.5, now + 0.2);
+                
+                gain.gain.setValueAtTime(0.05, now + idx * 0.03);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+                
+                osc.start(now + idx * 0.03);
+                osc.stop(now + 0.25);
+            });
+        }
+
+        // ゲーム完了・ゲームオーバー時のファンファーレ
+        function playGameOverSound() {
+            if (!audioCtx) return;
+            initAudio();
+            const now = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(400, now);
+            osc.frequency.linearRampToValueAtTime(100, now + 0.5);
+            
+            gain.gain.setValueAtTime(0.15, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+            
+            osc.start();
+            osc.stop(now + 0.6);
+        }
+
+
+        /**
+         * --- 設定メニュー管理 ---
+         */
+        let userSettings = {
+            difficulty: 'normal',
+            acceleration: 'normal', 
+            time: 60
+        };
+
+        const difficultyParams = {
+            easy: { speedMult: 0.5, spawnBase: 1500, maxEnemies: 6, initialEnemies: 2 },
+            normal: { speedMult: 0.8, spawnBase: 1000, maxEnemies: 10, initialEnemies: 3 },
+            hard: { speedMult: 1.2, spawnBase: 600, maxEnemies: 15, initialEnemies: 5 }
+        };
+
+        const accelerationParams = {
+            slow: 300000,
+            normal: 100000,
+            fast: 40000
+        };
+
+        function setDifficulty(level) {
+            userSettings.difficulty = level;
+            document.querySelectorAll('[id^="btn-diff-"]').forEach(btn => btn.classList.remove('selected'));
+            document.getElementById(`btn-diff-${level}`).classList.add('selected');
+        }
+
+        function setAcceleration(rate) {
+            userSettings.acceleration = rate;
+            document.querySelectorAll('[id^="btn-accel-"]').forEach(btn => btn.classList.remove('selected'));
+            document.getElementById(`btn-accel-${rate}`).classList.add('selected');
+        }
+
+        function setTime(seconds) {
+            userSettings.time = seconds;
+            document.querySelectorAll('[id^="btn-time-"]').forEach(btn => btn.classList.remove('selected'));
+            document.getElementById(`btn-time-${seconds}`).classList.add('selected');
+        }
+
+        /**
+         * --- ゲームエンジンとCanvas描画システム ---
+         */
+        const playArea = document.getElementById('play-area');
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d', { alpha: true });
+        
+        let width, height;
+        function resize() {
+            width = canvas.width = playArea.clientWidth;
+            height = canvas.height = playArea.clientHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize(); // 初期化
+
+        const state = {
+            isPlaying: false,
+            mode: '',
+            score: 0,
+            combo: 0,
+            maxCombo: 0,
+            hp: 100,
+            timeLeft: 0,
+            keysTyped: 0,
+            keysHit: 0,
+            startTime: 0,
+            kills: 0,
+            enemies: [],
+            bullets: [],
+            particles: [],
+            spawnRate: 1000,
+            lastSpawnTime: 0,
+            baseSpeed: 1,
+            maxEnemies: 8,
+            focusedEnemyId: null 
+        };
+
+        const uiScore = document.getElementById('score-display');
+        const uiCombo = document.getElementById('combo-display');
+        const uiWpm = document.getElementById('wpm-display');
+        const uiHpContainer = document.getElementById('hp-container');
+        const uiHpBar = document.getElementById('hp-bar');
+        const uiTimer = document.getElementById('timer-display');
+        const uiMenu = document.getElementById('menu-overlay');
+        const uiTargetList = document.getElementById('target-list-container');
+        const uiActionText = document.getElementById('action-text');
+        
+        // ★新規：別枠表示用DOM
+        const uiFocusDisplayContainer = document.getElementById('focus-display-container');
+        const uiFocusWordMonitor = document.getElementById('focus-word-monitor');
+
+        /**
+         * 敵（ターゲット）クラス
+         */
+        class Enemy {
+            constructor() {
+                this.id = Math.random().toString(36).substr(2, 9);
+                const wordDef = dictionary[Math.floor(Math.random() * dictionary.length)];
+                this.kanji = wordDef.kanji;
+                this.kana = wordDef.kana;
+                
+                // オリジナル候補リストを不変データとして保持
+                this.originalRomajis = generateRomajis(wordDef.kana);
+                this.validRomajis = [...this.originalRomajis];
+                this.typedLength = 0;
+                this.missCount = 0; // 新規：連続ミスマッチ回数を管理するカウンター
+                
+                this.size = 20;
+                this.x = Math.random() * (width - 100) + 50;
+                this.y = height + this.size + 10; 
+                
+                // 文字数が多いほどゆっくりに（長文タイピング中のバランス維持）
+                const speedFactor = 3.5 / (0.5 + this.kana.length);
+                this.speedY = -(state.baseSpeed * speedFactor + Math.random() * 0.2);
+                
+                this.isDying = false;
+                this.isCompleted = false; // 入力を最後まで完了したターゲットかを識別するフラグ
+                
+                this.createListDOM();
+            }
+
+            createListDOM() {
+                const div = document.createElement('div');
+                div.className = 'target-item flex justify-between items-center py-1 px-2 border-b border-blue-900/30 text-sm';
+                div.id = `target-${this.id}`;
+                this.domElement = div;
+                this.updateListDOM();
+                
+                uiTargetList.appendChild(div);
+            }
+
+            updateListDOM() {
+                if(!this.domElement) return;
+                const currentTargetStr = this.validRomajis[0]; 
+                const typedStr = currentTargetStr.substring(0, this.typedLength);
+                const remainStr = currentTargetStr.substring(this.typedLength);
+
+                // 進捗率の計算
+                const progressPercent = Math.round((this.typedLength / currentTargetStr.length) * 100);
+                
+                // メインフォーカスか保留状態かでCSSクラスとUI表示を切り替える
+                const isFocused = (state.focusedEnemyId === this.id);
+                
+                // 元の基本クラスを適用
+                this.domElement.className = 'target-item flex justify-between items-center py-1 px-2 border-b border-blue-900/30 text-sm';
+                if (isFocused) {
+                    this.domElement.classList.add('focus-active');
+                } else if (this.typedLength > 0) {
+                    this.domElement.classList.add('hit');
+                }
+
+                // フォーカスされているターゲットは、パーセンテージもゴールドで光らせる
+                const progressUI = this.typedLength > 0 
+                    ? `<span class="text-xs font-bold font-mono ml-2 ${isFocused ? 'text-yellow-400 text-glow-gold' : 'text-blue-400 text-glow'}">[${progressPercent}%]</span>` 
+                    : '';
+
+                this.domElement.innerHTML = `
+                    <span class="w-1/3 text-gray-500 text-left overflow-hidden whitespace-nowrap">${this.kana}</span>
+                    <span class="w-1/3 text-white font-bold text-center">${this.kanji}</span>
+                    <span class="w-1/3 text-right font-mono tracking-wider flex justify-end items-center">
+                        <span class="${isFocused ? 'text-yellow-400 font-extrabold' : 'text-blue-400 font-bold'}">${typedStr}</span><span class="text-gray-600">${remainStr}</span>
+                        ${progressUI}
+                    </span>
+                `;
+            }
+
+            destroyDOM(isSuccess = true) {
+                if(this.domElement) {
+                    this.domElement.classList.remove('focus-active', 'hit');
+                    
+                    if (isSuccess) {
+                        this.domElement.classList.add('destroyed-success');
+                    } else {
+                        this.domElement.classList.add('destroyed-fail');
+                    }
+                    
+                    const targetDOM = this.domElement;
+                    this.domElement = null; 
+                    setTimeout(() => {
+                        if(targetDOM && targetDOM.parentNode) {
+                            targetDOM.parentNode.removeChild(targetDOM);
+                        }
+                    }, 280);
+                }
+            }
+
+            update() {
+                if(this.isDying) return;
+                this.y += this.speedY;
+
+                // 枠の上端（y < 0）を超えたらダメージ
+                if (this.y < -this.size) {
+                    this.isDying = true;
+                    this.destroyDOM(false);
+                    if (state.focusedEnemyId === this.id) {
+                        state.focusedEnemyId = null; 
+                        updateFocusWordMonitor(); // 別枠表示のリセット
+                    }
+                    if(state.mode === 'survival') takeDamage(10);
+                    createParticles(this.x, 20, '#ef4444', 15);
+                }
+            }
+
+            draw() {
+                if(this.isDying) return;
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                const colorRatio = this.typedLength / this.validRomajis[0].length;
+                
+                const isFocused = (state.focusedEnemyId === this.id);
+                let r, g, b;
+                
+                if (isFocused) {
+                    r = 234; g = 179; b = 8;
+                } else {
+                    r = 30 + (colorRatio * 50);
+                    g = 58 + (colorRatio * 100);
+                    b = 138 + (colorRatio * 117);
+                }
+                
+                ctx.strokeStyle = `rgba(${r},${g},${b}, 0.8)`;
+                ctx.fillStyle = `rgba(${r},${g},${b}, 0.2)`;
+                ctx.lineWidth = isFocused ? 3 : 2; 
+                ctx.shadowBlur = isFocused ? 20 : 15;
+                ctx.shadowColor = `rgba(${r},${g},${b}, 0.8)`;
+
+                ctx.beginPath();
+                ctx.moveTo(0, -this.size);
+                ctx.lineTo(this.size, 0);
+                ctx.lineTo(0, this.size);
+                ctx.lineTo(-this.size, 0);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+
+                if(this.typedLength > 0) {
+                    ctx.fillStyle = isFocused ? '#facc15' : '#60a5fa';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.size * colorRatio * 0.5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
+        }
+
+        class Bullet {
+            constructor(startX, startY, targetEnemy) {
+                this.x = startX;
+                this.y = startY;
+                this.target = targetEnemy;
+                this.speed = 25;
+                this.active = true;
+            }
+
+            update() {
+                if(!this.active) return;
+                const dx = this.target.x - this.x;
+                const dy = this.target.y - this.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+
+                if (dist < this.speed) {
+                    this.active = false;
+                    createParticles(this.target.x, this.target.y, '#60a5fa', 5);
+                    
+                    if(this.target.isCompleted || this.target.typedLength >= this.target.validRomajis[0].length) {
+                        this.target.isDying = true;
+                        this.target.destroyDOM(true);
+                        
+                        if (state.focusedEnemyId === this.target.id) {
+                            state.focusedEnemyId = null;
+                            updateFocusWordMonitor(); // 別枠表示のリセット
+                        }
+
+                        playExplodeSound();
+
+                        createParticles(this.target.x, this.target.y, '#93c5fd', 30);
+                        addScore(100 + state.combo * 10);
+                        state.combo++;
+                        if(state.combo > state.maxCombo) state.maxCombo = state.combo;
+                        state.kills++;
+                        updateHUD();
+                    }
+                } else {
+                    this.x += (dx / dist) * this.speed;
+                    this.y += (dy / dist) * this.speed;
+                }
+            }
+
+            draw() {
+                if(!this.active) return;
+                ctx.fillStyle = '#fff';
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = '#60a5fa';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+        }
+
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 5 + 1;
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+                this.life = 1.0;
+                this.decay = Math.random() * 0.05 + 0.02;
+                this.size = Math.random() * 3 + 1;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life -= this.decay;
+            }
+
+            draw() {
+                if (this.life <= 0) return;
+                ctx.globalAlpha = this.life;
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, this.size, this.size);
+                ctx.globalAlpha = 1.0;
+            }
+        }
+
+        function createParticles(x, y, color, count) {
+            for(let i=0; i<count; i++) {
+                state.particles.push(new Particle(x, y, color));
+            }
+        }
+
+        function showActionText(text, colorClass = 'text-blue-400') {
+            uiActionText.textContent = text;
+            uiActionText.className = `absolute inset-0 flex items-center justify-center text-4xl font-bold ${colorClass} text-glow transition-opacity duration-100 opacity-100 pointer-events-none`;
+            clearTimeout(uiActionText.timeout);
+            uiActionText.timeout = setTimeout(() => {
+                uiActionText.classList.remove('opacity-100');
+                uiActionText.classList.add('opacity-0');
+            }, 800);
+        }
+
+        function takeDamage(amount) {
+            state.hp -= amount;
+            if(state.hp < 0) state.hp = 0;
+            uiHpBar.style.width = `${state.hp}%`;
+            
+            playMissSound();
+
+            state.combo = 0;
+            updateHUD();
+            playArea.style.transform = `translateX(${(Math.random()-0.5)*15}px)`;
+            setTimeout(() => playArea.style.transform = 'none', 50);
+
+            if(state.hp <= 0) endGame();
+        }
+
+        function addScore(points) { state.score += points; }
+
+        function updateHUD() {
+            uiScore.textContent = state.score.toString().padStart(5, '0');
+            uiCombo.textContent = state.combo;
+            const elapsedMin = (performance.now() - state.startTime) / 60000;
+            if(elapsedMin > 0) {
+                uiWpm.textContent = Math.round((state.keysHit / 5) / elapsedMin);
+            }
+        }
+
+        // ★新規：現在フォーカスされている入力中ワードの別枠モニター表示を更新する関数
+        function updateFocusWordMonitor() {
+            if (!state.isPlaying) {
+                uiFocusWordMonitor.innerHTML = `<span class="text-sm text-gray-500 animate-pulse">AWAITING PROTOCOL...</span>`;
+                uiFocusDisplayContainer.className = "w-full max-w-4xl bg-gray-950/90 border border-blue-900 rounded-md p-3 mb-1.5 border-glow flex items-center justify-between transition-all duration-300";
+                return;
+            }
+
+            const focusedEnemy = state.enemies.find(e => e.id === state.focusedEnemyId && !e.isDying && !e.isCompleted);
+            if (focusedEnemy) {
+                const currentTargetStr = focusedEnemy.validRomajis[0];
+                const typedStr = currentTargetStr.substring(0, focusedEnemy.typedLength);
+                const remainStr = currentTargetStr.substring(focusedEnemy.typedLength);
+                const progressPercent = Math.round((focusedEnemy.typedLength / currentTargetStr.length) * 100);
+
+                // モニター枠をゴールドネオンに光らせる
+                uiFocusDisplayContainer.className = "w-full max-w-4xl bg-gray-950/95 border border-yellow-500 rounded-md p-3 mb-1.5 border-glow-gold flex items-center justify-between transition-all duration-300";
+
+                uiFocusWordMonitor.innerHTML = `
+                    <div class="flex items-center gap-6">
+                        <span class="text-lg text-gray-400 font-mono tracking-wider">[${focusedEnemy.kana}]</span>
+                        <span class="text-2xl font-extrabold text-white tracking-widest text-glow">${focusedEnemy.kanji}</span>
+                        <span class="text-2xl font-mono tracking-widest ml-4">
+                            <span class="text-yellow-400 font-extrabold text-glow-gold">${typedStr}</span><span class="text-gray-600">${remainStr}</span>
+                        </span>
+                        <span class="text-lg font-bold font-mono text-yellow-400 text-glow-gold ml-2 animate-pulse">${progressPercent}%</span>
+                    </div>
+                `;
+            } else {
+                // ロック対象がない時はシステム待機中の落ち着いた青色の状態
+                uiFocusDisplayContainer.className = "w-full max-w-4xl bg-gray-950/90 border border-blue-900 rounded-md p-3 mb-1.5 border-glow flex items-center justify-between transition-all duration-300";
+                uiFocusWordMonitor.innerHTML = `<span class="text-sm text-blue-500/70 font-mono tracking-wider animate-pulse">AWAITING INPUT INTERCEPT...</span>`;
+            }
+        }
+
+        function handleInput(key) {
+            if(!state.isPlaying) return;
+            if(key.length !== 1 || !/[a-zA-Z\-]/.test(key)) return;
+            
+            state.keysTyped++;
+            const inputChar = key.toLowerCase();
+            let hitCount = 0;
+            let targetEnemies = [];
+
+            state.enemies.forEach(enemy => {
+                if(enemy.isDying || enemy.isCompleted) return;
+                
+                // 1. まずは現在の進行位置のままマッチするかチェック
+                const nextValidRoutes = enemy.validRomajis.filter(romaji => romaji[enemy.typedLength] === inputChar);
+
+                if(nextValidRoutes.length > 0) {
+                    enemy.validRomajis = nextValidRoutes;
+                    enemy.typedLength++;
+                    enemy.missCount = 0; // 進みがあったのでミスはリセット
+                    
+                    if (enemy.typedLength >= enemy.validRomajis[0].length) {
+                        enemy.isCompleted = true;
+                    }
+                    
+                    hitCount++;
+                    targetEnemies.push(enemy);
+                } else {
+                    // バックトラック・自動乗り換え＆リカバリー処理
+                    let recovered = false;
+
+                    if (enemy.typedLength > 0) {
+                        const currentTargetStr = enemy.validRomajis[0];
+                        const typedStr = currentTargetStr.substring(0, enemy.typedLength);
+                        
+                        for (let len = typedStr.length; len > 0; len--) {
+                            const sub = typedStr.substring(typedStr.length - len); 
+                            const candidate = sub + inputChar;
+                            
+                            const matchingRoutes = enemy.originalRomajis.filter(romaji => romaji.startsWith(candidate));
+                            if (matchingRoutes.length > 0) {
+                                enemy.validRomajis = matchingRoutes;
+                                enemy.typedLength = candidate.length;
+                                enemy.missCount = 0; // リカバリー成功時はミスリセット
+                                
+                                if (enemy.typedLength >= enemy.validRomajis[0].length) {
+                                    enemy.isCompleted = true;
+                                }
+                                
+                                hitCount++;
+                                targetEnemies.push(enemy);
+                                recovered = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    // リカバリーに失敗した場合（純粋なミスマッチ）
+                    if (!recovered) {
+                        enemy.missCount++;
+                        
+                        // 2連続で間違えたら、ここで初めて進捗を 0 にリセット
+                        if (enemy.missCount >= 2) {
+                            const startValidRoutes = enemy.originalRomajis.filter(romaji => romaji[0] === inputChar);
+                            if (startValidRoutes.length > 0) {
+                                enemy.validRomajis = startValidRoutes;
+                                enemy.typedLength = 1;
+                                enemy.missCount = 0;
+                                
+                                hitCount++;
+                                targetEnemies.push(enemy);
+                            } else {
+                                enemy.validRomajis = [...enemy.originalRomajis];
+                                enemy.typedLength = 0;
+                            }
+                        }
+                    }
+                }
+            });
+
+            if(hitCount > 0) {
+                state.keysHit++;
+                addScore(10 * hitCount); 
+                
+                // 同時入力でも確実にタイピング音が鳴るように変更
+                playLaserSound();
+
+                // アクティブ・フォーカス対象を決定するロジック
+                let maxProgress = -1;
+                let candidateFocusId = null;
+                
+                targetEnemies.forEach(enemy => {
+                    if (enemy.typedLength > maxProgress) {
+                        maxProgress = enemy.typedLength;
+                        candidateFocusId = enemy.id;
+                    }
+                });
+
+                if (candidateFocusId) {
+                    state.focusedEnemyId = candidateFocusId;
+                }
+
+                // 登録ターゲット全体のDOM表示を更新
+                state.enemies.forEach(enemy => {
+                    enemy.updateListDOM();
+                });
+
+                // ★新規：別枠表示を即時更新
+                updateFocusWordMonitor();
+
+                // 弾の発射位置計算（相対座標）
+                const keyCode = `Key${inputChar.toUpperCase()}`;
+                const keyElem = keyElementsMap[keyCode] || keyElementsMap['Space'];
+                
+                let startX = width / 2;
+                let startY = height; 
+
+                if(keyElem) {
+                    const playAreaRect = playArea.getBoundingClientRect();
+                    const keyRect = keyElem.getBoundingClientRect();
+                    startX = keyRect.left + keyRect.width / 2 - playAreaRect.left;
+                    startY = height;
+                }
+
+                targetEnemies.forEach(enemy => {
+                    state.bullets.push(new Bullet(startX, startY, enemy));
+                });
+
+                if(hitCount > 1) {
+                    playMultiSyncSound();
+                    showActionText(`MULTI SYNC x${hitCount}`, 'text-purple-400');
+                    addScore(50 * hitCount);
+                }
+
+            } else {
+                playMissSound();
+
+                // ★新規：ミスのタイミングでも進行度が0になったり変化するので、別枠を更新
+                updateFocusWordMonitor();
+
+                if(state.combo > 0) {
+                    state.combo = 0;
+                    updateHUD();
+                }
+            }
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (['Tab', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code) || e.key === ' ') {
+                e.preventDefault(); 
+            }
+            const keyElement = keyElementsMap[e.code];
+            if (keyElement) keyElement.classList.add('active-blue');
+            handleInput(e.key);
+        });
+
+        window.addEventListener('keyup', (e) => {
+            const keyElement = keyElementsMap[e.code];
+            if (keyElement) keyElement.classList.remove('active-blue');
+        });
+
+        let animationId;
+
+        function update() {
+            if(!state.isPlaying) return;
+            const now = performance.now();
+
+            if (state.mode === 'timeattack') {
+                const elapsed = (now - state.startTime) / 1000;
+                state.timeLeft = Math.max(0, userSettings.time - elapsed);
+                uiTimer.textContent = state.timeLeft.toFixed(2) + 's';
+                
+                if (state.timeLeft <= 0) {
+                    endGame();
+                    return;
+                }
+            }
+
+            // 設定から難易度と加速度のパラメータを取得
+            const diffParam = difficultyParams[userSettings.difficulty];
+            const accelDivisor = accelerationParams[userSettings.acceleration];
+            const elapsedMs = now - state.startTime;
+            
+            state.baseSpeed = (1 + (elapsedMs / accelDivisor)) * diffParam.speedMult;
+            state.maxEnemies = diffParam.maxEnemies;
+
+            // 画面上に生きている敵が完全にゼロになった場合、即座に湧かせる
+            const activeEnemies = state.enemies.filter(e => !e.isDying && !e.isCompleted);
+            if (activeEnemies.length === 0) {
+                const instantEnemy = new Enemy();
+                state.enemies.push(instantEnemy);
+                state.lastSpawnTime = now; 
+                updateFocusWordMonitor(); // 新規湧きに伴う表示更新
+            }
+
+            // フォーカス対象の敵が「進行度が0に戻ってしまった」か「画面外・死亡・入力完了」した場合は、現在残っている中で一番進捗が進んでいるものに切り替える
+            const aliveAndUnfocused = state.enemies.filter(e => !e.isDying && !e.isCompleted && e.id !== state.focusedEnemyId && e.typedLength > 0);
+            if (!state.enemies.some(e => !e.isDying && !e.isCompleted && e.id === state.focusedEnemyId && e.typedLength > 0)) {
+                if (aliveAndUnfocused.length > 0) {
+                    aliveAndUnfocused.sort((a, b) => b.typedLength - a.typedLength);
+                    state.focusedEnemyId = aliveAndUnfocused[0].id;
+                    state.enemies.forEach(e => e.updateListDOM());
+                } else {
+                    state.focusedEnemyId = null;
+                }
+                // ★別枠表示の更新
+                updateFocusWordMonitor();
+            }
+
+            // 上にあるターゲット順（Y座標が小さい順 ＝ ゴールに近い順）に、表リストの表示を並べ替える
+            const sortedEnemies = state.enemies
+                .filter(e => !e.isDying && e.domElement)
+                .sort((a, b) => a.y - b.y);
+
+            sortedEnemies.forEach(enemy => {
+                uiTargetList.appendChild(enemy.domElement);
+            });
+
+            // 敵の自動生成
+            if (now - state.lastSpawnTime > state.spawnRate) {
+                if(state.enemies.length < state.maxEnemies) {
+                    const newEnemy = new Enemy();
+                    state.enemies.push(newEnemy);
+                    
+                    const spawnAccelFactor = accelDivisor / 40000; 
+                    const baseSpawnRate = Math.max(400, diffParam.spawnBase - (elapsedMs / (50 * spawnAccelFactor)));
+                    const extraWait = newEnemy.kana.length * 100; 
+                    
+                    state.spawnRate = baseSpawnRate + extraWait;
+                } else {
+                    state.lastSpawnTime = now - 100;
+                }
+                state.lastSpawnTime = now;
+            }
+
+            state.bullets.forEach(b => b.update());
+            state.particles.forEach(p => p.update());
+            state.enemies.forEach(e => e.update());
+
+            state.bullets = state.bullets.filter(b => b.active);
+            state.particles = state.particles.filter(p => p.life > 0);
+            state.enemies = state.enemies.filter(e => {
+                if(e.isDying && state.bullets.every(b => b.target !== e)) return false;
+                return true;
+            });
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, width, height);
+
+            // サイバーグリッド線
+            ctx.strokeStyle = 'rgba(30, 58, 138, 0.15)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for(let x=0; x<width; x+=50) { ctx.moveTo(x, 0); ctx.lineTo(x, height); }
+            for(let y=0; y<height; y+=50) { ctx.moveTo(0, y); ctx.lineTo(width, y); }
+            ctx.stroke();
+
+            state.enemies.forEach(e => e.draw());
+            state.bullets.forEach(b => b.draw());
+            
+            ctx.globalCompositeOperation = 'lighter';
+            state.particles.forEach(p => p.draw());
+            ctx.globalCompositeOperation = 'source-over';
+        }
+
+        function loop() {
+            update();
+            draw();
+            if(state.isPlaying) {
+                animationId = requestAnimationFrame(loop);
+            }
+        }
+
+        function startGame(mode) {
+            initAudio(); 
+            resize(); 
+            
+            state.isPlaying = true;
+            state.mode = mode;
+            state.score = 0;
+            state.combo = 0;
+            state.maxCombo = 0;
+            state.hp = 100;
+            state.keysTyped = 0;
+            state.keysHit = 0;
+            state.kills = 0;
+            state.startTime = performance.now();
+            state.lastSpawnTime = state.startTime;
+            state.focusedEnemyId = null; 
+            
+            state.spawnRate = difficultyParams[userSettings.difficulty].spawnBase;
+
+            state.enemies.forEach(e => {
+                if(e.domElement && e.domElement.parentNode) {
+                    e.domElement.parentNode.removeChild(e.domElement);
+                }
+            });
+            state.enemies = [];
+            state.bullets = [];
+            state.particles = [];
+            uiTargetList.innerHTML = '';
+            uiMenu.classList.add('hidden');
+
+            document.getElementById('settings-panel').classList.add('hidden');
+            document.getElementById('mode-display').textContent = 
+                `MODE: ${mode === 'timeattack' ? 'TIME ATTACK' : 'SURVIVAL'} [${userSettings.difficulty.toUpperCase()} / ACCEL:${userSettings.acceleration.toUpperCase()}]`;
+            
+            if(mode === 'survival') {
+                uiHpContainer.classList.remove('hidden');
+                uiTimer.classList.add('hidden');
+                uiHpBar.style.width = '100%';
+            } else {
+                uiHpContainer.classList.add('hidden');
+                uiTimer.classList.remove('hidden');
+                uiTimer.textContent = userSettings.time.toFixed(2) + 's';
+            }
+
+            // ★別枠モニターの初期化
+            updateFocusWordMonitor();
+            updateHUD();
+
+            // スタート時に最初から難易度に応じたターゲット数が同時に出現するよう変更
+            const initialCount = difficultyParams[userSettings.difficulty].initialEnemies;
+            for (let i = 0; i < initialCount; i++) {
+                const enemy = new Enemy();
+                enemy.y = height + enemy.size + 10 + (i * 80);
+                state.enemies.push(enemy);
+            }
+            
+            if(animationId) cancelAnimationFrame(animationId);
+            loop();
+        }
+
+        function endGame() {
+            state.isPlaying = false;
+            
+            playGameOverSound();
+
+            uiMenu.classList.remove('hidden');
+            document.getElementById('menu-title').textContent = 'ENGAGEMENT COMPLETE';
+            document.getElementById('menu-subtitle').textContent = 'SYSTEM PERFORMANCE REPORT';
+            document.getElementById('settings-panel').classList.remove('hidden');
+            
+            const stats = document.getElementById('result-stats');
+            stats.classList.remove('hidden');
+            stats.classList.add('flex');
+
+            const acc = state.keysTyped > 0 ? Math.round((state.keysHit / state.keysTyped) * 100) : 0;
+            const wpm = uiWpm.textContent;
+
+            document.getElementById('res-score').textContent = state.score;
+            document.getElementById('res-combo').textContent = state.maxCombo;
+            document.getElementById('res-wpm').textContent = wpm;
+            document.getElementById('res-acc').textContent = acc + '%';
+            document.getElementById('res-kills').textContent = state.kills;
+
+            // ★終了時のモニター表示リセット
+            updateFocusWordMonitor();
+        }
+
+    </script>
+</body>
+</html>
