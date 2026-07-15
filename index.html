@@ -322,7 +322,7 @@
             return Array.from(new Set(results));
         }
 
-                const dictionary = [
+                        const dictionary = [
     { kana: "ねこ", kanji: "猫" },
     { kana: "いぬ", kanji: "犬" },
     { kana: "しんかんせん", kanji: "新幹線" },
@@ -600,6 +600,9 @@
         const uiFocusDisplayContainer = document.getElementById('focus-display-container');
         const uiFocusWordMonitor = document.getElementById('focus-word-monitor');
 
+        /**
+         * 敵（ターゲット）クラス
+         */
         class Enemy {
             constructor() {
                 this.id = Math.random().toString(36).substr(2, 9);
@@ -607,20 +610,28 @@
                 this.kanji = wordDef.kanji;
                 this.kana = wordDef.kana;
                 
+                // オリジナル候補リストを不変データとして保持
                 this.originalRomajis = generateRomajis(wordDef.kana);
                 this.validRomajis = [...this.originalRomajis];
                 this.typedLength = 0;
-                this.missCount = 0; 
+                this.missCount = 0; // 連続ミスマッチ回数
                 
                 this.size = 20;
                 this.x = Math.random() * (width - 100) + 50;
+                
+                // ★修正：進行度（0 = 画面下端, 1 = 画面上端のデッドライン）で位置を管理
+                this.progress = 0;
+                
+                // ★修正：到達秒数（Time-to-Target）の決定
+                // 文字数が多いほど猶予時間(秒)が長くなるベース値
+                const baseTimeSeconds = 6 + (this.kana.length * 0.8);
+                // 難易度や経過時間によるスピード倍率で割り、ランダムな揺らぎを加える
+                this.targetTimeSeconds = (baseTimeSeconds / state.baseSpeed) + (Math.random() * 1.5 - 0.5);
+                
                 this.y = height + this.size + 10; 
                 
-                const speedFactor = 3.5 / (0.5 + this.kana.length);
-                this.speedY = -(state.baseSpeed * speedFactor + Math.random() * 0.2);
-                
                 this.isDying = false;
-                this.isCompleted = false; 
+                this.isCompleted = false; // 入力を最後まで完了したターゲットフラグ
                 
                 this.createListDOM();
             }
@@ -687,8 +698,16 @@
 
             update() {
                 if(this.isDying) return;
-                this.y += this.speedY;
+                
+                // ★修正：60FPS基準で、目標の秒数に到達するように進行度（0〜1）を加算する
+                this.progress += 1 / (this.targetTimeSeconds * 60);
+                
+                // ★修正：現在の画面の高さに合わせて、進行度からY座標を動的に計算する（リサイズにも完全追従！）
+                const startY = height + this.size + 10;
+                const endY = -this.size - 10;
+                this.y = startY - ((startY - endY) * this.progress);
 
+                // 枠の上端を超えたらダメージ
                 if (this.y < -this.size) {
                     this.isDying = true;
                     this.destroyDOM(false);
