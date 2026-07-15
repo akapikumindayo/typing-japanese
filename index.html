@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -11,9 +10,9 @@
 
         body {
             font-family: 'Share Tech Mono', monospace;
-            background-color: #020617; /* 画面全体の背景 */
-            /* ★修正：画面全体のスクロールを許可し、狭い画面でもパーツが潰れないようにします */
-            overflow-y: auto;
+            /* ★修正：画面の高さに完全固定し、スクロールを無くします */
+            background-color: #020617; 
+            overflow: hidden; 
         }
 
         /* 輝くネオンエフェクト */
@@ -58,108 +57,97 @@
             border-left: 4px solid transparent;
         }
         
-        /* 1. スタンバイ（マルチシンク等で裏で進んでいるが、主ターゲットではない状態：落ち着いた青） */
         .target-item.hit {
-            background-color: rgba(37, 99, 235, 0.08); /* 控えめなダークブルー */
+            background-color: rgba(37, 99, 235, 0.08);
             border-left: 4px solid #2563eb;
         }
         
-        /* 2. メインフォーカス（現在タイピングの主軸となっているターゲット：輝くゴールド） */
         .target-item.focus-active {
-            background-color: rgba(234, 179, 8, 0.15) !important; /* ゴールド */
+            background-color: rgba(234, 179, 8, 0.15) !important;
             border-left: 4px solid #eab308 !important;
             box-shadow: 0 0 12px rgba(234, 179, 8, 0.15);
             transform: scale(1.01) translateX(4px);
         }
 
-        /* ターゲット撃破成功時の爽快スライドアウト消滅エフェクト */
+        /* 消滅エフェクト */
         .target-item.destroyed-success {
             opacity: 0 !important;
             transform: scale(0.9) translateX(50px) !important;
-            background-color: rgba(147, 197, 253, 0.2) !important; /* 青白く光る */
+            background-color: rgba(147, 197, 253, 0.2) !important;
             border-left: 4px solid #93c5fd !important;
             box-shadow: 0 0 20px rgba(147, 197, 253, 0.4) !important;
         }
 
-        /* ターゲット見逃し失敗時の赤警告上昇消滅エフェクト */
         .target-item.destroyed-fail {
             opacity: 0 !important;
             transform: scale(0.9) translateY(-30px) !important;
-            background-color: rgba(239, 68, 68, 0.2) !important; /* 赤く光る */
+            background-color: rgba(239, 68, 68, 0.2) !important;
             border-left: 4px solid #ef4444 !important;
             box-shadow: 0 0 20px rgba(239, 68, 68, 0.4) !important;
         }
-
-        /* スクロールバー非表示 */
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-thumb { background: #1e3a8a; border-radius: 4px; }
     </style>
 </head>
-<body class="text-slate-100 min-h-screen flex flex-col items-center select-none relative p-3 md:p-6" onclick="initAudio()">
+<body class="text-slate-100 h-screen w-screen flex flex-col items-center justify-between select-none p-2 md:p-4" onclick="initAudio()">
 
-    <!-- 全てのパーツを1つの最大幅 4xl (896px) の共通コンテナで包み込み、左右のラインを完全に同期 -->
-    <div class="w-full max-w-4xl flex flex-col gap-4 pointer-events-none">
+    <!-- ★修正：親コンテナを h-full にし、画面いっぱいに広げつつ、子要素で高さを分け合います -->
+    <div class="w-full max-w-4xl h-full flex flex-col justify-between gap-2 md:gap-3 pointer-events-none">
 
-        <!-- 1. ヘッダー＆HUD領域 -->
-        <div id="game-hud" class="w-full flex justify-between items-start z-10">
+        <!-- 1. ヘッダー＆HUD領域 (flex-noneで自身の高さを維持) -->
+        <div id="game-hud" class="w-full flex justify-between items-start z-10 flex-none px-2">
             <div class="flex flex-col">
-                <h1 class="text-3xl font-extrabold text-blue-500 tracking-widest text-glow mb-1">
+                <h1 class="text-2xl md:text-3xl font-extrabold text-blue-500 tracking-widest text-glow mb-1">
                     CYBER TYPE
                 </h1>
-                <div id="mode-display" class="text-xs text-blue-400 tracking-wider">SELECT MODE</div>
+                <div id="mode-display" class="text-[10px] md:text-xs text-blue-400 tracking-wider">SELECT MODE</div>
                 
-                <!-- サバイバル用HPバー -->
-                <div id="hp-container" class="mt-2 w-48 h-2 bg-gray-900 border border-blue-900 rounded hidden">
+                <div id="hp-container" class="mt-2 w-32 md:w-48 h-2 bg-gray-900 border border-blue-900 rounded hidden">
                     <div id="hp-bar" class="h-full bg-blue-500 shadow-[0_0_10px_#3b82f6] transition-all duration-300" style="width: 100%;"></div>
                 </div>
-                <!-- タイムアタック用タイマー -->
-                <div id="timer-display" class="mt-2 text-xl text-blue-300 font-bold hidden text-glow">00.00s</div>
+                <div id="timer-display" class="mt-1 md:mt-2 text-lg md:text-xl text-blue-300 font-bold hidden text-glow">00.00s</div>
             </div>
 
-            <!-- スコア・コンボ -->
-            <div class="flex gap-6 text-right">
+            <div class="flex gap-4 md:gap-6 text-right">
                 <div class="flex flex-col items-end">
-                    <span class="text-[10px] text-gray-500">SCORE</span>
-                    <span id="score-display" class="text-2xl text-white font-bold text-glow">00000</span>
+                    <span class="text-[9px] md:text-[10px] text-gray-500">SCORE</span>
+                    <span id="score-display" class="text-xl md:text-2xl text-white font-bold text-glow">00000</span>
                 </div>
                 <div class="flex flex-col items-end">
-                    <span class="text-[10px] text-gray-500">COMBO</span>
-                    <span id="combo-display" class="text-2xl text-blue-400 font-bold text-glow">0</span>
+                    <span class="text-[9px] md:text-[10px] text-gray-500">COMBO</span>
+                    <span id="combo-display" class="text-xl md:text-2xl text-blue-400 font-bold text-glow">0</span>
                 </div>
                 <div class="flex flex-col items-end">
-                    <span class="text-[10px] text-gray-500">WPM</span>
-                    <span id="wpm-display" class="text-2xl text-gray-300 font-bold">0</span>
+                    <span class="text-[9px] md:text-[10px] text-gray-500">WPM</span>
+                    <span id="wpm-display" class="text-xl md:text-2xl text-gray-300 font-bold">0</span>
                 </div>
             </div>
         </div>
 
-        <!-- 2. プレイエリア枠（★重要：潰れるのを防ぐため、高さを固定値 h-[400px]、大画面では h-[480px] に設定します） -->
-        <div class="w-full z-10 relative h-[400px] md:h-[480px] transition-all">
+        <!-- 2. プレイエリア枠（★修正：flex-grow を指定し、画面の余った「すべての高さ」を自動で占有させます） -->
+        <div class="w-full z-10 relative flex-grow min-h-[150px]">
             <div id="play-area" class="absolute inset-0 border border-blue-900 border-glow bg-gray-900/40 rounded-lg overflow-hidden">
                 <canvas id="game-canvas" class="absolute inset-0 w-full h-full"></canvas>
                 
-                <!-- アクションテキスト（枠内中央に表示） -->
-                <div id="action-text" class="absolute inset-0 flex items-center justify-center text-2xl font-bold text-blue-400 text-glow transition-opacity duration-300 opacity-0">
+                <div id="action-text" class="absolute inset-0 flex items-center justify-center text-xl md:text-2xl font-bold text-blue-400 text-glow transition-opacity duration-300 opacity-0">
                     PERFECT CHAIN!
                 </div>
             </div>
         </div>
 
-        <!-- 3. 入力中の単語を大きく映し出す別枠モニターエリア -->
-        <div id="focus-display-container" class="w-full bg-gray-950/90 border border-blue-900 rounded-md p-3 border-glow flex items-center justify-between transition-all duration-300">
-            <span class="text-xs text-blue-400 font-bold tracking-widest font-mono">ACTIVE TARGET</span>
-            <div id="focus-word-monitor" class="flex items-center gap-6 flex-grow justify-center">
-                <span class="text-sm text-gray-500 animate-pulse">AWAITING PROTOCOL...</span>
+        <!-- 3. 入力中の単語モニター (flex-none) -->
+        <div id="focus-display-container" class="w-full bg-gray-950/90 border border-blue-900 rounded-md p-2 md:p-3 border-glow flex items-center justify-between transition-all duration-300 flex-none">
+            <span class="text-[10px] md:text-xs text-blue-400 font-bold tracking-widest font-mono">ACTIVE TARGET</span>
+            <div id="focus-word-monitor" class="flex items-center gap-4 md:gap-6 flex-grow justify-center">
+                <span class="text-xs md:text-sm text-gray-500 animate-pulse">AWAITING PROTOCOL...</span>
             </div>
         </div>
 
-        <!-- 4. ターゲット一覧 -->
-        <div class="w-full bg-gray-900/60 backdrop-blur border border-blue-900 rounded-lg p-3 border-glow flex flex-col gap-1.5 overflow-hidden h-32" id="target-list-container">
+        <!-- 4. ターゲット一覧 (flex-none, 高さを少し抑えめに) -->
+        <div class="w-full bg-gray-900/60 backdrop-blur border border-blue-900 rounded-lg p-2 md:p-3 border-glow flex flex-col gap-1 overflow-hidden h-24 md:h-32 flex-none" id="target-list-container">
             <!-- JSで挿入 -->
         </div>
 
-        <!-- 5. キーボードエリア（横幅を親コンテナに100%合わせ、左右端を完全に一致させるレスポンシブ比率配列仕様） -->
-        <div id="keyboard" class="flex flex-col gap-1.5 p-4 bg-gray-900/80 backdrop-blur rounded-lg border border-blue-900 border-glow w-full pointer-events-auto">
+        <!-- 5. キーボードエリア (flex-none, パディングとギャップを調整して高さを節約) -->
+        <div id="keyboard" class="flex flex-col gap-1 md:gap-1.5 p-2 md:p-3 bg-gray-900/80 backdrop-blur rounded-lg border border-blue-900 border-glow w-full pointer-events-auto flex-none">
             <!-- JSで生成 -->
         </div>
 
@@ -167,12 +155,12 @@
 
     <!-- モード選択・リザルト画面 (オーバーレイ) -->
     <div id="menu-overlay" class="absolute inset-0 flex flex-col items-center justify-center bg-gray-950/80 backdrop-blur-sm z-50">
-        <div class="bg-gray-900 border-2 border-blue-800 rounded-xl p-8 max-w-2xl w-full text-center border-glow">
-            <h2 id="menu-title" class="text-4xl font-bold text-blue-500 mb-2 text-glow">SYSTEM READY</h2>
-            <p id="menu-subtitle" class="text-sm text-gray-400 mb-6">CONFIGURE ENGAGEMENT PROTOCOL</p>
+        <div class="bg-gray-900 border-2 border-blue-800 rounded-xl p-6 md:p-8 max-w-2xl w-11/12 text-center border-glow">
+            <h2 id="menu-title" class="text-3xl md:text-4xl font-bold text-blue-500 mb-2 text-glow">SYSTEM READY</h2>
+            <p id="menu-subtitle" class="text-xs md:text-sm text-gray-400 mb-6">CONFIGURE ENGAGEMENT PROTOCOL</p>
 
-            <div id="result-stats" class="hidden flex-col gap-2 mb-6 text-left bg-gray-950 p-4 border border-blue-900/50 rounded">
-                <div class="flex justify-between"><span class="text-gray-500">SCORE</span><span id="res-score" class="text-white font-bold text-xl">0</span></div>
+            <div id="result-stats" class="hidden flex-col gap-2 mb-6 text-left bg-gray-950 p-4 border border-blue-900/50 rounded text-sm">
+                <div class="flex justify-between"><span class="text-gray-500">SCORE</span><span id="res-score" class="text-white font-bold text-lg md:text-xl">0</span></div>
                 <div class="flex justify-between"><span class="text-gray-500">MAX COMBO</span><span id="res-combo" class="text-blue-400">0</span></div>
                 <div class="flex justify-between"><span class="text-gray-500">WPM</span><span id="res-wpm" class="text-gray-300">0</span></div>
                 <div class="flex justify-between"><span class="text-gray-500">ACCURACY</span><span id="res-acc" class="text-gray-300">100%</span></div>
@@ -180,41 +168,41 @@
             </div>
 
             <!-- 設定オプション -->
-            <div id="settings-panel" class="mb-8 grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
+            <div id="settings-panel" class="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 text-left">
                 <!-- 難易度 -->
                 <div>
-                    <p class="text-xs text-blue-400 font-bold mb-2">DIFFICULTY</p>
-                    <div class="flex flex-col gap-2">
-                        <button onclick="setDifficulty('easy')" id="btn-diff-easy" class="setting-btn py-2 px-4 border border-blue-800 rounded text-blue-300 text-xs hover:bg-blue-900/30">EASY (かんたん)</button>
-                        <button onclick="setDifficulty('normal')" id="btn-diff-normal" class="setting-btn py-2 px-4 border border-blue-800 rounded text-blue-300 text-xs hover:bg-blue-900/30 selected">NORMAL (ふつう)</button>
-                        <button onclick="setDifficulty('hard')" id="btn-diff-hard" class="setting-btn py-2 px-4 border border-blue-800 rounded text-blue-300 text-xs hover:bg-blue-900/30">HARD (スピーディー)</button>
+                    <p class="text-[10px] md:text-xs text-blue-400 font-bold mb-1 md:mb-2">DIFFICULTY</p>
+                    <div class="flex flex-col gap-1.5 md:gap-2">
+                        <button onclick="setDifficulty('easy')" id="btn-diff-easy" class="setting-btn py-1.5 md:py-2 px-2 md:px-4 border border-blue-800 rounded text-blue-300 text-[10px] md:text-xs hover:bg-blue-900/30">EASY (かんたん)</button>
+                        <button onclick="setDifficulty('normal')" id="btn-diff-normal" class="setting-btn py-1.5 md:py-2 px-2 md:px-4 border border-blue-800 rounded text-blue-300 text-[10px] md:text-xs hover:bg-blue-900/30 selected">NORMAL (ふつう)</button>
+                        <button onclick="setDifficulty('hard')" id="btn-diff-hard" class="setting-btn py-1.5 md:py-2 px-2 md:px-4 border border-blue-800 rounded text-blue-300 text-[10px] md:text-xs hover:bg-blue-900/30">HARD (スピーディー)</button>
                     </div>
                 </div>
                 <!-- 速度上昇ペース -->
                 <div>
-                    <p class="text-xs text-blue-400 font-bold mb-2">SPEED ACCELERATION</p>
-                    <div class="flex flex-col gap-2">
-                        <button onclick="setAcceleration('slow')" id="btn-accel-slow" class="setting-btn py-2 px-4 border border-blue-800 rounded text-blue-300 text-xs hover:bg-blue-900/30">SLOW (ゆっくり)</button>
-                        <button onclick="setAcceleration('normal')" id="btn-accel-normal" class="setting-btn py-2 px-4 border border-blue-800 rounded text-blue-300 text-xs hover:bg-blue-900/30 selected">NORMAL (標準)</button>
-                        <button onclick="setAcceleration('fast')" id="btn-accel-fast" class="setting-btn py-2 px-4 border border-blue-800 rounded text-blue-300 text-xs hover:bg-blue-900/30">FAST (はやい)</button>
+                    <p class="text-[10px] md:text-xs text-blue-400 font-bold mb-1 md:mb-2">SPEED ACCELERATION</p>
+                    <div class="flex flex-col gap-1.5 md:gap-2">
+                        <button onclick="setAcceleration('slow')" id="btn-accel-slow" class="setting-btn py-1.5 md:py-2 px-2 md:px-4 border border-blue-800 rounded text-blue-300 text-[10px] md:text-xs hover:bg-blue-900/30">SLOW (ゆっくり)</button>
+                        <button onclick="setAcceleration('normal')" id="btn-accel-normal" class="setting-btn py-1.5 md:py-2 px-2 md:px-4 border border-blue-800 rounded text-blue-300 text-[10px] md:text-xs hover:bg-blue-900/30 selected">NORMAL (標準)</button>
+                        <button onclick="setAcceleration('fast')" id="btn-accel-fast" class="setting-btn py-1.5 md:py-2 px-2 md:px-4 border border-blue-800 rounded text-blue-300 text-[10px] md:text-xs hover:bg-blue-900/30">FAST (はやい)</button>
                     </div>
                 </div>
                 <!-- 制限時間 -->
                 <div>
-                    <p class="text-xs text-blue-400 font-bold mb-2">TIME LIMIT <span class="text-gray-500 font-normal">(TA)</span></p>
-                    <div class="flex flex-col gap-2">
-                        <button onclick="setTime(30)" id="btn-time-30" class="setting-btn py-2 px-4 border border-blue-800 rounded text-blue-300 text-xs hover:bg-blue-900/30">30 SECONDS</button>
-                        <button onclick="setTime(60)" id="btn-time-60" class="setting-btn py-2 px-4 border border-blue-800 rounded text-blue-300 text-xs hover:bg-blue-900/30 selected">60 SECONDS</button>
-                        <button onclick="setTime(90)" id="btn-time-90" class="setting-btn py-2 px-4 border border-blue-800 rounded text-blue-300 text-xs hover:bg-blue-900/30">90 SECONDS</button>
+                    <p class="text-[10px] md:text-xs text-blue-400 font-bold mb-1 md:mb-2">TIME LIMIT <span class="text-gray-500 font-normal">(TA)</span></p>
+                    <div class="flex flex-col gap-1.5 md:gap-2">
+                        <button onclick="setTime(30)" id="btn-time-30" class="setting-btn py-1.5 md:py-2 px-2 md:px-4 border border-blue-800 rounded text-blue-300 text-[10px] md:text-xs hover:bg-blue-900/30">30 SECONDS</button>
+                        <button onclick="setTime(60)" id="btn-time-60" class="setting-btn py-1.5 md:py-2 px-2 md:px-4 border border-blue-800 rounded text-blue-300 text-[10px] md:text-xs hover:bg-blue-900/30 selected">60 SECONDS</button>
+                        <button onclick="setTime(90)" id="btn-time-90" class="setting-btn py-1.5 md:py-2 px-2 md:px-4 border border-blue-800 rounded text-blue-300 text-[10px] md:text-xs hover:bg-blue-900/30">90 SECONDS</button>
                     </div>
                 </div>
             </div>
 
             <div class="flex gap-4 justify-center pointer-events-auto">
-                <button onclick="startGame('timeattack')" class="w-1/2 py-3 bg-blue-900/40 hover:bg-blue-600/60 border border-blue-500 rounded text-blue-200 font-bold tracking-widest transition-all hover:shadow-[0_0_15px_#3b82f6] hover:scale-105">
+                <button onclick="startGame('timeattack')" class="w-1/2 py-2.5 md:py-3 bg-blue-900/40 hover:bg-blue-600/60 border border-blue-500 rounded text-blue-200 text-xs md:text-sm font-bold tracking-widest transition-all hover:shadow-[0_0_15px_#3b82f6] hover:scale-105">
                     START TIME ATTACK
                 </button>
-                <button onclick="startGame('survival')" class="w-1/2 py-3 bg-red-900/30 hover:bg-red-600/50 border border-red-700 rounded text-red-300 font-bold tracking-widest transition-all hover:shadow-[0_0_15px_#ef4444] hover:scale-105">
+                <button onclick="startGame('survival')" class="w-1/2 py-2.5 md:py-3 bg-red-900/30 hover:bg-red-600/50 border border-red-700 rounded text-red-300 text-xs md:text-sm font-bold tracking-widest transition-all hover:shadow-[0_0_15px_#ef4444] hover:scale-105">
                     START SURVIVAL
                 </button>
             </div>
@@ -236,7 +224,7 @@
             "ぎゃ": ["gya"], "ぎゅ": ["gyu"], "ぎょ": ["gyo"],
             "じゃ": ["ja", "zya"], "じゅ": ["ju", "zyu"], "じょ": ["jo", "zyo"],
             "びゃ": ["bya"], "びゅ": ["byu"], "びょ": ["byo"],
-            "ぴゃ": ["pya"], "ぴゅ": ["pyu"], "ぴょ": ["ぴょ"],
+            "ぴゃ": ["pya"], "ぴゅ": ["pyu"], "ぴょ": ["pyo"],
             "ふぁ": ["fa"], "ふぃ": ["fi"], "ふぇ": ["fe"], "ふぉ": ["fo"],
             "でぃ": ["dhi", "di"], "どぅ": ["dwu"],
             "てぃ": ["thi", "ti"], "とぅ": ["twu"],
@@ -265,9 +253,6 @@
             "ー": ["-"],
         };
 
-        /**
-         * --- ひらがな解析・ローマ字組み合わせ自動生成 ---
-         */
         function generateRomajis(kana) {
             const results = [];
 
@@ -277,7 +262,6 @@
                     return;
                 }
 
-                // 1. 促音「っ」の処理
                 if (kana[i] === 'っ' && i + 1 < kana.length) {
                     let nextLen = 1;
                     let nextKana = kana[i + 1];
@@ -304,7 +288,6 @@
                     return;
                 }
 
-                // 2. 撥音「ん」の処理
                 if (kana[i] === 'ん') {
                     if (i + 1 < kana.length) {
                         const nextChar = kana[i + 1];
@@ -318,7 +301,6 @@
                     return;
                 }
 
-                // 3. 2文字 of 拗音変換（最優先）
                 if (i + 1 < kana.length) {
                     const twoChars = kana.substring(i, i + 2);
                     if (romanMap[twoChars]) {
@@ -328,7 +310,6 @@
                     }
                 }
 
-                // 4. 1文字の通常変換
                 const oneChar = kana[i];
                 if (romanMap[oneChar]) {
                     romanMap[oneChar].forEach(r => {
@@ -341,10 +322,7 @@
             return Array.from(new Set(results));
         }
 
-        /**
-         * --- 辞書データ ---
-         */
-        const dictionary = [
+                const dictionary = [
     { kana: "ねこ", kanji: "猫" },
     { kana: "いぬ", kanji: "犬" },
     { kana: "しんかんせん", kanji: "新幹線" },
@@ -390,6 +368,7 @@
 
         /**
          * --- UI構築：キーボード ---
+         * ★修正: 高さをレスポンシブ(h-8 md:h-10)にし、文字サイズも調整。縦幅を節約して1画面に収めます。
          */
         const keyboardLayout = [
             [
@@ -427,13 +406,12 @@
 
             row.forEach(keyData => {
                 const keyButton = document.createElement('div');
-                const baseClasses = 'flex items-center justify-center rounded text-sm font-bold text-blue-500 bg-gray-950 border border-blue-900/80 shadow-inner transition-all duration-75 h-10';
+                // h-10 を h-8 md:h-10 に変更して省スペース化
+                const baseClasses = 'flex items-center justify-center rounded text-[10px] md:text-sm font-bold text-blue-500 bg-gray-950 border border-blue-900/80 shadow-inner transition-all duration-75 h-8 md:h-10';
                 keyButton.className = baseClasses;
                 keyButton.textContent = keyData.label;
 
-                // 横幅を固定ピクセルではなくflex比率で動的に設定
                 keyButton.style.flex = keyData.flex;
-
                 keyButton.id = `key-${keyData.code}`;
                 keyElementsMap[keyData.code] = keyButton;
                 rowDiv.appendChild(keyButton);
@@ -441,9 +419,6 @@
             keyboardContainer.appendChild(rowDiv);
         });
 
-        /**
-         * --- 効果音生成システム (Web Audio API) ---
-         */
         let audioCtx = null;
 
         function initAudio() {
@@ -455,7 +430,6 @@
             }
         }
 
-        // キー打鍵成功時のSFレーザー音
         function playLaserSound() {
             if (!audioCtx) return;
             initAudio();
@@ -475,7 +449,6 @@
             osc.stop(audioCtx.currentTime + 0.1);
         }
 
-        // ターゲット消去完了時のデジタル破裂音
         function playExplodeSound() {
             if (!audioCtx) return;
             initAudio();
@@ -495,16 +468,14 @@
             osc.stop(audioCtx.currentTime + 0.25);
         }
 
-        // ミスタイプ音のトリガー
         function playMissSound() {
-            // ノイズを防ぐため、現在は無音に設定されています
+            // ミス音は無音
         }
 
-        // 同時デリート（マルチシンク）の和音チャイム
         function playMultiSyncSound() {
             if (!audioCtx) return;
             initAudio();
-            const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6 の和音
+            const notes = [523.25, 659.25, 783.99, 1046.50];
             const now = audioCtx.currentTime;
             
             notes.forEach((freq, idx) => {
@@ -514,7 +485,7 @@
                 gain.connect(audioCtx.destination);
                 
                 osc.type = 'sine';
-                osc.frequency.setValueAtTime(freq, now + idx * 0.03); // アルペジオ風に少しズラす
+                osc.frequency.setValueAtTime(freq, now + idx * 0.03); 
                 osc.frequency.exponentialRampToValueAtTime(freq * 1.5, now + 0.2);
                 
                 gain.gain.setValueAtTime(0.05, now + idx * 0.03);
@@ -525,7 +496,6 @@
             });
         }
 
-        // ゲーム完了・ゲームオーバー時のファンファーレ
         function playGameOverSound() {
             if (!audioCtx) return;
             initAudio();
@@ -546,10 +516,6 @@
             osc.stop(now + 0.6);
         }
 
-
-        /**
-         * --- 設定メニュー管理 ---
-         */
         let userSettings = {
             difficulty: 'normal',
             acceleration: 'normal', 
@@ -586,9 +552,6 @@
             document.getElementById(`btn-time-${seconds}`).classList.add('selected');
         }
 
-        /**
-         * --- ゲームエンジンとCanvas描画システム ---
-         */
         const playArea = document.getElementById('play-area');
         const canvas = document.getElementById('game-canvas');
         const ctx = canvas.getContext('2d', { alpha: true });
@@ -599,7 +562,9 @@
             height = canvas.height = playArea.clientHeight;
         }
         window.addEventListener('resize', resize);
-        resize(); // 初期化
+        
+        // 最初のロード時にも確実にリサイズを実行
+        setTimeout(resize, 100);
 
         const state = {
             isPlaying: false,
@@ -632,14 +597,9 @@
         const uiMenu = document.getElementById('menu-overlay');
         const uiTargetList = document.getElementById('target-list-container');
         const uiActionText = document.getElementById('action-text');
-        
-        // 別枠表示用DOM
         const uiFocusDisplayContainer = document.getElementById('focus-display-container');
         const uiFocusWordMonitor = document.getElementById('focus-word-monitor');
 
-        /**
-         * 敵（ターゲット）クラス
-         */
         class Enemy {
             constructor() {
                 this.id = Math.random().toString(36).substr(2, 9);
@@ -647,29 +607,27 @@
                 this.kanji = wordDef.kanji;
                 this.kana = wordDef.kana;
                 
-                // オリジナル候補リストを不変データとして保持
                 this.originalRomajis = generateRomajis(wordDef.kana);
                 this.validRomajis = [...this.originalRomajis];
                 this.typedLength = 0;
-                this.missCount = 0; // 連続ミスマッチ回数
+                this.missCount = 0; 
                 
                 this.size = 20;
                 this.x = Math.random() * (width - 100) + 50;
                 this.y = height + this.size + 10; 
                 
-                // 文字数が多いほどゆっくりに（長文タイピング中のバランス維持）
                 const speedFactor = 3.5 / (0.5 + this.kana.length);
                 this.speedY = -(state.baseSpeed * speedFactor + Math.random() * 0.2);
                 
                 this.isDying = false;
-                this.isCompleted = false; // 入力を最後まで完了したターゲットフラグ
+                this.isCompleted = false; 
                 
                 this.createListDOM();
             }
 
             createListDOM() {
                 const div = document.createElement('div');
-                div.className = 'target-item flex justify-between items-center py-1 px-2 border-b border-blue-900/30 text-sm';
+                div.className = 'target-item flex justify-between items-center py-1 px-2 border-b border-blue-900/30 text-[10px] md:text-sm';
                 div.id = `target-${this.id}`;
                 this.domElement = div;
                 this.updateListDOM();
@@ -683,13 +641,10 @@
                 const typedStr = currentTargetStr.substring(0, this.typedLength);
                 const remainStr = currentTargetStr.substring(this.typedLength);
 
-                // 進捗率の計算
                 const progressPercent = Math.round((this.typedLength / currentTargetStr.length) * 100);
-                
-                // メインフォーカスか保留状態かでCSSクラスとUI表示を切り替える
                 const isFocused = (state.focusedEnemyId === this.id);
                 
-                this.domElement.className = 'target-item flex justify-between items-center py-1 px-2 border-b border-blue-900/30 text-sm';
+                this.domElement.className = 'target-item flex justify-between items-center py-1 px-2 border-b border-blue-900/30 text-[10px] md:text-sm';
                 if (isFocused) {
                     this.domElement.classList.add('focus-active');
                 } else if (this.typedLength > 0) {
@@ -697,7 +652,7 @@
                 }
 
                 const progressUI = this.typedLength > 0 
-                    ? `<span class="text-xs font-bold font-mono ml-2 ${isFocused ? 'text-yellow-400 text-glow-gold' : 'text-blue-400 text-glow'}">[${progressPercent}%]</span>` 
+                    ? `<span class="text-[10px] md:text-xs font-bold font-mono ml-2 ${isFocused ? 'text-yellow-400 text-glow-gold' : 'text-blue-400 text-glow'}">[${progressPercent}%]</span>` 
                     : '';
 
                 this.domElement.innerHTML = `
@@ -734,7 +689,6 @@
                 if(this.isDying) return;
                 this.y += this.speedY;
 
-                // 枠の上端（y < 0）を超えたらダメージ
                 if (this.y < -this.size) {
                     this.isDying = true;
                     this.destroyDOM(false);
@@ -881,7 +835,7 @@
 
         function showActionText(text, colorClass = 'text-blue-400') {
             uiActionText.textContent = text;
-            uiActionText.className = `absolute inset-0 flex items-center justify-center text-4xl font-bold ${colorClass} text-glow transition-opacity duration-100 opacity-100 pointer-events-none`;
+            uiActionText.className = `absolute inset-0 flex items-center justify-center text-2xl md:text-4xl font-bold ${colorClass} text-glow transition-opacity duration-100 opacity-100 pointer-events-none`;
             clearTimeout(uiActionText.timeout);
             uiActionText.timeout = setTimeout(() => {
                 uiActionText.classList.remove('opacity-100');
@@ -915,11 +869,10 @@
             }
         }
 
-        // 現在フォーカスされている入力中ワードの別枠モニター表示を更新する関数
         function updateFocusWordMonitor() {
             if (!state.isPlaying) {
-                uiFocusWordMonitor.innerHTML = `<span class="text-sm text-gray-500 animate-pulse">AWAITING PROTOCOL...</span>`;
-                uiFocusDisplayContainer.className = "w-full bg-gray-950/90 border border-blue-900 rounded-md p-3 border-glow flex items-center justify-between transition-all duration-300";
+                uiFocusWordMonitor.innerHTML = `<span class="text-xs md:text-sm text-gray-500 animate-pulse">AWAITING PROTOCOL...</span>`;
+                uiFocusDisplayContainer.className = "w-full bg-gray-950/90 border border-blue-900 rounded-md p-2 md:p-3 border-glow flex items-center justify-between transition-all duration-300 flex-none";
                 return;
             }
 
@@ -930,38 +883,34 @@
                 const remainStr = currentTargetStr.substring(focusedEnemy.typedLength);
                 const progressPercent = Math.round((focusedEnemy.typedLength / currentTargetStr.length) * 100);
 
-                // モニター枠をゴールドネオンに光らせる
-                uiFocusDisplayContainer.className = "w-full bg-gray-950/95 border border-yellow-500 rounded-md p-3 border-glow-gold flex items-center justify-between transition-all duration-300";
+                uiFocusDisplayContainer.className = "w-full bg-gray-950/95 border border-yellow-500 rounded-md p-2 md:p-3 border-glow-gold flex items-center justify-between transition-all duration-300 flex-none";
 
                 uiFocusWordMonitor.innerHTML = `
-                    <div class="flex items-center gap-6">
-                        <span class="text-lg text-gray-400 font-mono tracking-wider">[${focusedEnemy.kana}]</span>
-                        <span class="text-2xl font-extrabold text-white tracking-widest text-glow">${focusedEnemy.kanji}</span>
-                        <span class="text-2xl font-mono tracking-widest ml-4">
+                    <div class="flex items-center gap-2 md:gap-6">
+                        <span class="text-[10px] md:text-lg text-gray-400 font-mono tracking-wider truncate hidden sm:block">[${focusedEnemy.kana}]</span>
+                        <span class="text-lg md:text-2xl font-extrabold text-white tracking-widest text-glow">${focusedEnemy.kanji}</span>
+                        <span class="text-lg md:text-2xl font-mono tracking-widest ml-2 md:ml-4">
                             <span class="text-yellow-400 font-extrabold text-glow-gold">${typedStr}</span><span class="text-gray-600">${remainStr}</span>
                         </span>
-                        <span class="text-lg font-bold font-mono text-yellow-400 text-glow-gold ml-2 animate-pulse">${progressPercent}%</span>
+                        <span class="text-xs md:text-lg font-bold font-mono text-yellow-400 text-glow-gold ml-2 animate-pulse">${progressPercent}%</span>
                     </div>
                 `;
             } else {
-                uiFocusDisplayContainer.className = "w-full bg-gray-950/90 border border-blue-900 rounded-md p-3 border-glow flex items-center justify-between transition-all duration-300";
-                uiFocusWordMonitor.innerHTML = `<span class="text-sm text-blue-500/70 font-mono tracking-wider animate-pulse">AWAITING INPUT INTERCEPT...</span>`;
+                uiFocusDisplayContainer.className = "w-full bg-gray-950/90 border border-blue-900 rounded-md p-2 md:p-3 border-glow flex items-center justify-between transition-all duration-300 flex-none";
+                uiFocusWordMonitor.innerHTML = `<span class="text-[10px] md:text-sm text-blue-500/70 font-mono tracking-wider animate-pulse">AWAITING INPUT INTERCEPT...</span>`;
             }
         }
 
-        // 修飾キー（Shift, Ctrl, Alt, Win）の自動消灯を制御するタイマー
         const activeModKeys = {};
 
         function handleInput(key, rawCode = null) {
             if(!state.isPlaying) return;
             
-            // 修飾キーが押された際、そのキーをハイライトし自動でフェードアウトさせるセーフティ
             if (rawCode && ['ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight', 'AltLeft', 'AltRight', 'MetaLeft'].includes(rawCode)) {
                 const modElem = keyElementsMap[rawCode];
                 if (modElem) {
                     modElem.classList.add('active-blue');
                     clearTimeout(activeModKeys[rawCode]);
-                    // 押しっぱなしバグを防ぐため200msで強制消灯
                     activeModKeys[rawCode] = setTimeout(() => {
                         modElem.classList.remove('active-blue');
                     }, 200);
@@ -1048,7 +997,6 @@
                 
                 playLaserSound();
 
-                // アクティブ・フォーカス対象を決定するロジック
                 let maxProgress = -1;
                 let candidateFocusId = null;
                 
@@ -1069,7 +1017,6 @@
 
                 updateFocusWordMonitor();
 
-                // 弾の発射位置計算（相対座標）
                 const keyCode = `Key${inputChar.toUpperCase()}`;
                 const keyElem = keyElementsMap[keyCode] || keyElementsMap['Space'];
                 
@@ -1136,7 +1083,6 @@
                 }
             }
 
-            // 設定から難易度と加速度のパラメータを取得
             const diffParam = difficultyParams[userSettings.difficulty];
             const accelDivisor = accelerationParams[userSettings.acceleration];
             const elapsedMs = now - state.startTime;
@@ -1144,7 +1090,6 @@
             state.baseSpeed = (1 + (elapsedMs / accelDivisor)) * diffParam.speedMult;
             state.maxEnemies = diffParam.maxEnemies;
 
-            // 画面上に生きている敵が完全にゼロになった場合、即座に湧かせる
             const activeEnemies = state.enemies.filter(e => !e.isDying && !e.isCompleted);
             if (activeEnemies.length === 0) {
                 const instantEnemy = new Enemy();
@@ -1153,7 +1098,6 @@
                 updateFocusWordMonitor(); 
             }
 
-            // フォーカス対象の敵が「進行度が0に戻ってしまった」か「画面外・死亡・入力完了」した場合は、現在残っている中で一番進捗が進んでいるものに切り替える
             const aliveAndUnfocused = state.enemies.filter(e => !e.isDying && !e.isCompleted && e.id !== state.focusedEnemyId && e.typedLength > 0);
             if (!state.enemies.some(e => !e.isDying && !e.isCompleted && e.id === state.focusedEnemyId && e.typedLength > 0)) {
                 if (aliveAndUnfocused.length > 0) {
@@ -1166,7 +1110,6 @@
                 updateFocusWordMonitor();
             }
 
-            // 上にあるターゲット順に、表リストの表示を並べ替える
             const sortedEnemies = state.enemies
                 .filter(e => !e.isDying && e.domElement)
                 .sort((a, b) => a.y - b.y);
@@ -1175,7 +1118,6 @@
                 uiTargetList.appendChild(enemy.domElement);
             });
 
-            // 敵の自動生成
             if (now - state.lastSpawnTime > state.spawnRate) {
                 if(state.enemies.length < state.maxEnemies) {
                     const newEnemy = new Enemy();
@@ -1207,7 +1149,6 @@
         function draw() {
             ctx.clearRect(0, 0, width, height);
 
-            // サイバーグリッド線
             ctx.strokeStyle = 'rgba(30, 58, 138, 0.15)';
             ctx.lineWidth = 1;
             ctx.beginPath();
@@ -1233,8 +1174,10 @@
 
         function startGame(mode) {
             initAudio(); 
+            // 開始前に確実なリサイズを反映
             resize(); 
-            
+            setTimeout(resize, 50);
+
             state.isPlaying = true;
             state.mode = mode;
             state.score = 0;
@@ -1285,11 +1228,6 @@
                 state.enemies.push(enemy);
             }
             
-            // ★新規：ゲーム開始時にプレイエリア（ゲーム画面）が最適に見える位置へ自動的にスムーズスクロールします
-            setTimeout(() => {
-                document.getElementById('game-hud').scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }, 100);
-
             if(animationId) cancelAnimationFrame(animationId);
             loop();
         }
